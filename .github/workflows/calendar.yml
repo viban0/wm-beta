@@ -1,0 +1,28 @@
+name: 학사일정 아침 브리핑
+
+on:
+  
+  workflow_dispatch:
+
+jobs:
+  daily_report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 가져오기
+        uses: actions/checkout@v3
+
+      - name: 파이썬 설치
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      # ▼ 크롬 브라우저 환경 세팅 추가 ▼
+      - name: 라이브러리 설치
+        run: |
+          pip install selenium webdriver-manager beautifulsoup4 requests
+
+      - name: 학사일정 알림 실행
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python calendar_bot.py
