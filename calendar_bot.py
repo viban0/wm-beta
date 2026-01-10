@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from datetime import date, datetime, timedelta
 import re
 
-# ▼ 셀레니움 라이브러리 (학사일정용) ▼
+# ▼ 셀레니움 라이브러리 ▼
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -21,7 +21,6 @@ TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
 # ★★★ [테스트 설정] ★★★
-# 이 날짜를 '오늘'이라고 가정합니다.
 TEST_DATE = date(2026, 2, 20) 
 
 def send_telegram(message):
@@ -39,8 +38,12 @@ def send_telegram(message):
             print(f"텔레그램 전송 실패: {e}")
 
 def get_cafeteria_menu():
-    # 학사일정 테스트에 집중하기 위해 식단은 간단히 처리
     return "😴 (학사일정 테스트 중이라 식단 정보는 생략합니다)"
+
+def get_day_kor(date_obj):
+    """ 날짜 객체를 받아서 한국어 요일(월~일) 반환 """
+    days = ["월", "화", "수", "목", "금", "토", "일"]
+    return days[date_obj.weekday()]
 
 def get_academic_calendar():
     chrome_options = Options()
@@ -68,18 +71,13 @@ def get_academic_calendar():
         time.sleep(1) 
         
         soup = BeautifulSoup(driver.page_source, 'html.parser')
-        
-        # 태그 구조로 찾기 (strong=날짜, p=제목)
-        # 페이지 내의 모든 li를 뒤져서 날짜/제목 있는 것만 추출 (무차별 탐색)
         all_list_items = soup.find_all("li")
         
-        today = TEST_DATE # ★ 테스트 날짜 적용 ★
+        today = TEST_DATE 
         
         today_events = []
         upcoming_events = []
         
-        print(f"🔍 전체 리스트 아이템 {len(all_list_items)}개 분석 시작...")
-
         for item in all_list_items:
             date_tag = item.find("strong")
             title_tag = item.find("p")
@@ -89,16 +87,12 @@ def get_academic_calendar():
             raw_date = date_tag.get_text(strip=True)
             title = title_tag.get_text(strip=True)
             
-            # 날짜 파싱 (02.02 ~ 02.27)
             dates = re.findall(r'(\d{2}\.\d{2})', raw_date)
             if not dates: continue
             
             current_year = today.year
             try:
-                # 시작일
                 s_date = datetime.strptime(f"{current_year}.{dates[0]}", "%Y.%m.%d").date()
-                
-                # 종료일 (없으면 시작일과 동일)
                 if len(dates) > 1:
                     e_date = datetime.strptime(f"{current_year}.{dates[1]}", "%Y.%m.%d").date()
                 else:
@@ -106,18 +100,19 @@ def get_academic_calendar():
             except:
                 continue
 
-            # [디버깅용 로그] - 실제 봇에서는 제거 가능
-            # if s_date.month == 2:
-            #     print(f"  - 확인됨: {raw_date} : {title}")
-
-            # 1. 오늘의 일정 (오늘이 기간 내에 포함되면)
+            # 1. 오늘의 일정
             if s_date <= today <= e_date:
-                today_events.append(f"• {title}")
+                # [수정] 기간이 있는 일정이라면 종료일 표시 (~ 02.27(금))
+                if s_date != e_date:
+                    end_str = e_date.strftime("%m.%d")
+                    end_day = get_day_kor(e_date)
+                    today_events.append(f"• {title} (~ {end_str}({end_day}))")
+                else:
+                    today_events.append(f"• {title}")
             
-            # 2. 다가오는 일정 (오늘 이후 시작되는 것)
+            # 2. 다가오는 일정
             elif s_date > today:
                 d_day = (s_date - today).days
-                # 너무 먼 일정은 제외 (예: 14일 이내)
                 if d_day <= 14: 
                     upcoming_events.append({
                         "date": raw_date,
@@ -131,12 +126,16 @@ def get_academic_calendar():
         else:
             events_text.append(f"🔔 *오늘의 일정*\n(일정이 없습니다)")
         
+        # [수정] 다가오는 일정 필터링 (가장 가까운 D-Day만, 동률 포함)
         if upcoming_events:
-            upcoming_events.sort(key=lambda x: x['d_day'])
-            top_events = upcoming_events[:5] # 최대 5개까지
+            upcoming_events.sort(key=lambda x: x['d_day']) # D-Day 오름차순 정렬
+            min_d_day = upcoming_events[0]['d_day'] # 가장 가까운 D-Day 값 (예: 3)
+            
+            # min_d_day와 같은 일정만 남김
+            nearest_events = [e for e in upcoming_events if e['d_day'] == min_d_day]
             
             temp = ["\n⏳ *다가오는 일정*"]
-            for e in top_events:
+            for e in nearest_events:
                 d_day_str = "D-DAY" if e['d_day'] == 0 else f"D-{e['d_day']}"
                 temp.append(f"[{d_day_str}] {e['title']} ({e['date']})")
             events_text.append("\n".join(temp))
@@ -154,15 +153,13 @@ def run():
     
     today_str = TEST_DATE.strftime('%Y-%m-%d (%a)')
     
-    # 1. 학사일정 가져오기 (실시간 크롤링 + 가짜 날짜 적용)
     calendar_msg = get_academic_calendar()
-    
-    # 2. 학식 정보 (생략)
     menu_msg = get_cafeteria_menu()
     
-    # 3. 메시지 통합
-    final_msg = f"☀️ *광운대 모닝 브리핑* ({today_str})\n\n" \
+    # [수정] 괄호 제거, 전체 일정 링크 위치 변경
+    final_msg = f"☀️ *광운대 모닝 브리핑* {today_str}\n\n" \
                 f"{calendar_msg}\n\n" \
+                f"[👉 전체 일정 보기]({CALENDAR_URL})\n" \
                 f"────────────────\n\n" \
                 f"🥄 *오늘의 학식*\n\n" \
                 f"{menu_msg}\n\n" \
