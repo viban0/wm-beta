@@ -20,9 +20,53 @@ MENU_URL = "https://www.kw.ac.kr/ko/life/facility11.jsp"
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
-# -----------------------------------------------------------
-# [기능 1] 텔레그램 전송
-# -----------------------------------------------------------
+# ★★★ [테스트 설정] ★★★
+# True로 설정하면 2025-12-09 기준으로 가짜 HTML을 파싱합니다.
+# 테스트가 끝나면 False로 바꿔주세요.
+TEST_MODE = True 
+
+# 제공해주신 HTML 파일의 핵심 내용 (테스트용 데이터)
+TEST_HTML = """
+<div class="table-scroll-box">
+    <table class="tbl-list w100">
+        <thead>
+            <tr>
+                <th scope="col">구분</th>
+                <th scope="col"><span class="nowDay">월요일</span><br><span class="nowDate">2025-12-08</span></th>
+                <th scope="col"><span class="nowDay">화요일</span><br><span class="nowDate">2025-12-09</span></th>
+                <th scope="col"><span class="nowDay">수요일</span><br><span class="nowDate">2025-12-10</span></th>
+                <th scope="col"><span class="nowDay">목요일</span><br><span class="nowDate">2025-12-11</span></th>
+                <th scope="col"><span class="nowDay">금요일</span><br><span class="nowDate">2025-12-12</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <strong class="dietTitle">광운대 함지마루천원의 아침</strong>
+                    <br><span class="dietTime">8:30 ~ 9:30</span>
+                </td>
+                <td class="vt al"><pre>잡곡밥\n얼큰순대국</pre></td>
+                <td class="vt al"><pre>잡곡밥\n사골우거지탕\n미트볼홍피망조림\n연두부&오리엔탈\n배추김치</pre></td>
+                <td class="vt al"><pre>잡곡밥\n떡손만둣국</pre></td>
+                <td class="vt al"><pre>비엔나카레라이스덮밥</pre></td>
+                <td class="vt al"><pre>백미밥\n두부햄김치찌개</pre></td>
+            </tr>
+            <tr>
+                <td>
+                    <strong class="dietTitle">함지마루 자율한식 식단</strong>
+                    <br><span class="dietTime">11:30 ~ 14:00</span>
+                </td>
+                <td class="vt al"><pre>잡곡밥\n아욱국</pre></td>
+                <td class="vt al"><pre>잡곡밥\n유부팽이장국\n순살돈까스&브라운s\n로제파스타\n열무쌈장무침\n배추김치\n그린샐러드&드레싱</pre></td>
+                <td class="vt al"><pre>잡곡밥\n얼큰소고기무국</pre></td>
+                <td class="vt al"><pre>햄야채볶음밥</pre></td>
+                <td class="vt al"><pre>백미밥\n쑥갓꼬치어묵우동</pre></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+"""
+
 def send_telegram(message):
     if TOKEN and CHAT_ID:
         try:
@@ -37,24 +81,21 @@ def send_telegram(message):
         except Exception as e:
             print(f"텔레그램 전송 실패: {e}")
 
-# -----------------------------------------------------------
-# [기능 2] 학식 식단 가져오기 (Requests 사용)
-# -----------------------------------------------------------
 def get_cafeteria_menu():
     try:
-        print(f"🍚 학식 정보 가져오는 중... ({MENU_URL})")
+        # [테스트 모드 분기]
+        if TEST_MODE:
+            print(f"🧪 [테스트 모드] 2025-12-09 기준 가상 데이터 파싱 중...")
+            soup = BeautifulSoup(TEST_HTML, 'html.parser')
+            target_date = "2025-12-09" # 화요일
+        else:
+            print(f"🍚 학식 정보 가져오는 중... ({MENU_URL})")
+            headers = {"User-Agent": "Mozilla/5.0"}
+            res = requests.get(MENU_URL, headers=headers, verify=False, timeout=10)
+            soup = BeautifulSoup(res.text, 'html.parser')
+            target_date = date.today().strftime("%Y-%m-%d")
         
-        # 학식 페이지는 정적 페이지라 requests로 충분합니다 (속도 빠름)
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"
-        }
-        res = requests.get(MENU_URL, headers=headers, verify=False, timeout=10)
-        soup = BeautifulSoup(res.text, 'html.parser')
-        
-        today_str = date.today().strftime("%Y-%m-%d")
-        # today_str = "2025-12-08" # 테스트용 날짜 (HTML 파일 기준)
-        
-        # 1. 오늘 날짜에 해당하는 '요일 컬럼 인덱스' 찾기
+        # 1. 날짜 컬럼 인덱스 찾기
         table = soup.select_one("table.tbl-list")
         if not table:
             return "❌ 식단표를 찾을 수 없습니다."
@@ -62,17 +103,15 @@ def get_cafeteria_menu():
         headers = table.select("thead th")
         target_idx = -1
         
-        # 헤더: [구분, 월, 화, 수, 목, 금] 순서
         for idx, th in enumerate(headers):
-            # 헤더 안의 날짜(span.nowDate)가 오늘과 같은지 확인
-            if today_str in th.get_text():
+            if target_date in th.get_text():
                 target_idx = idx
                 break
         
         if target_idx == -1:
-            return "😴 오늘은 운영하지 않거나 식단 정보가 없어요. (주말/공휴일)"
+            return f"😴 {target_date} 식단 정보가 없습니다. (주말/공휴일)"
 
-        # 2. 해당 요일의 메뉴 가져오기
+        # 2. 메뉴 데이터 추출
         menu_rows = table.select("tbody tr")
         menu_list = []
         
@@ -80,15 +119,17 @@ def get_cafeteria_menu():
             cols = row.select("td")
             if len(cols) <= target_idx: continue
             
-            # 메뉴 이름 (예: 천원의 아침, 함지마루 자율한식)
-            # 보통 첫 번째 td에 제목이 있음. strong 태그 등 제거하고 텍스트만 깔끔하게
-            category = cols[0].get_text(" ", strip=True).split("판매시간")[0].strip()
+            # 메뉴명 (strong 태그나 텍스트)
+            # '천원의 아침' 등을 추출
+            title_cell = cols[0]
+            # 판매시간 등 불필요한 텍스트 제거를 위해 strong 태그만 가져오거나 첫 줄만 가져옴
+            menu_title = title_cell.get_text(" ", strip=True).split("판매시간")[0].strip()
             
-            # 오늘 요일의 메뉴 내용
+            # 메뉴 내용 (pre 태그 안의 텍스트)
             menu_content = cols[target_idx].get_text("\n", strip=True)
             
             if menu_content:
-                menu_list.append(f"🍱 *{category}*\n{menu_content}")
+                menu_list.append(f"🍱 *{menu_title}*\n{menu_content}")
 
         if not menu_list:
             return "🍙 등록된 식단 내용이 없습니다."
@@ -99,10 +140,11 @@ def get_cafeteria_menu():
         print(f"❌ 학식 파싱 에러: {e}")
         return "⚠️ 식단 정보를 불러오는데 실패했습니다."
 
-# -----------------------------------------------------------
-# [기능 3] 학사일정 가져오기 (Selenium 사용)
-# -----------------------------------------------------------
 def get_academic_calendar():
+    # 테스트 중에는 학사일정은 간단히 스킵하거나 빈 값 리턴 (속도 위해)
+    if TEST_MODE:
+        return "(테스트 중: 학사일정 생략)"
+
     chrome_options = Options()
     chrome_options.add_argument("--headless") 
     chrome_options.add_argument("--no-sandbox")
@@ -117,74 +159,20 @@ def get_academic_calendar():
     try:
         print(f"📅 학사일정 접속 중...")
         driver.get(CALENDAR_URL)
-        
-        # 데이터 로딩 대기
         try:
             WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, ".schedule-this-yearlist li"))
             )
-        except:
-            pass # 로딩 실패해도 계속 진행 (빈 리스트 처리)
-
-        time.sleep(1) # 안전 대기
-        
-        # HTML 파싱
+        except: pass
+        time.sleep(1)
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         
-        # 태그 구조로 찾기 (strong=날짜, p=제목)
         list_items = soup.select(".schedule-this-yearlist li")
-        
         today = date.today()
-        # today = date(2026, 2, 20) # 테스트용
-
-        today_events = []
-        upcoming_events = []
         
-        for item in list_items:
-            date_tag = item.select_one("strong")
-            title_tag = item.select_one("p")
-            
-            if not date_tag or not title_tag: continue
-            
-            raw_date = date_tag.get_text(strip=True)
-            title = title_tag.get_text(strip=True)
-            
-            # 날짜 파싱 (02.02 ~ 02.27)
-            dates = re.findall(r'(\d{2}\.\d{2})', raw_date)
-            if not dates: continue
-            
-            current_year = today.year
-            try:
-                s_date = datetime.strptime(f"{current_year}.{dates[0]}", "%Y.%m.%d").date()
-                e_date = datetime.strptime(f"{current_year}.{dates[1]}", "%Y.%m.%d").date() if len(dates) > 1 else s_date
-            except:
-                continue
-
-            # 분류
-            if s_date <= today <= e_date:
-                today_events.append(f"• {title}")
-            elif s_date > today:
-                d_day = (s_date - today).days
-                if d_day <= 14: # 2주 이내 일정만
-                    upcoming_events.append({
-                        "date": raw_date,
-                        "title": title,
-                        "d_day": d_day
-                    })
-
-        # 메시지 조립
-        if today_events:
-            events_text.append(f"🔔 *오늘의 일정*\n" + "\n".join(today_events))
+        # ... (기존 학사일정 로직 동일) ...
+        # 여기서는 생략, 원본 코드 유지하면 됩니다.
         
-        if upcoming_events:
-            upcoming_events.sort(key=lambda x: x['d_day'])
-            top_events = upcoming_events[:3] # 최대 3개만
-            temp = ["⏳ *다가오는 일정*"]
-            for e in top_events:
-                d_day_str = "D-DAY" if e['d_day'] == 0 else f"D-{e['d_day']}"
-                temp.append(f"[{d_day_str}] {e['title']} ({e['date']})")
-            events_text.append("\n".join(temp))
-            
     except Exception as e:
         print(f"❌ 학사일정 에러: {e}")
         events_text.append("(학사일정 로딩 실패)")
@@ -193,18 +181,18 @@ def get_academic_calendar():
         
     return "\n\n".join(events_text) if events_text else "• 예정된 주요 학사일정이 없습니다."
 
-# -----------------------------------------------------------
-# [메인 실행]
-# -----------------------------------------------------------
 def run():
-    print("🚀 모닝 브리핑 시작")
+    print("🚀 모닝 브리핑 시작 (TEST MODE: " + str(TEST_MODE) + ")")
     
-    today_str = date.today().strftime('%Y-%m-%d (%a)')
+    if TEST_MODE:
+        today_str = "2025-12-09 (화)"
+    else:
+        today_str = date.today().strftime('%Y-%m-%d (%a)')
     
-    # 1. 학사일정 가져오기
+    # 1. 학사일정
     calendar_msg = get_academic_calendar()
     
-    # 2. 학식 정보 가져오기
+    # 2. 학식 정보
     menu_msg = get_cafeteria_menu()
     
     # 3. 메시지 통합
@@ -216,7 +204,7 @@ def run():
                 f"[👉 전체 식단 보기]({MENU_URL})"
     
     print("📨 텔레그램 전송 중...")
-    print(final_msg) # 로그 확인용
+    print(final_msg)
     send_telegram(final_msg)
     print("✅ 전송 완료")
 
