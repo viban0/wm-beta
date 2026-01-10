@@ -16,10 +16,7 @@ jobs:
         with:
           python-version: '3.9'
 
-      # ▼ 크롬 브라우저 환경 세팅 추가 ▼
-      - name: 라이브러리 설치
-        run: |
-          pip install selenium webdriver-manager beautifulsoup4 requests
+     
 
       - name: 학사일정 알림 실행
         env:
