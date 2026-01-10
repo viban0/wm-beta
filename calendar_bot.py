@@ -20,9 +20,6 @@ MENU_URL = "https://www.kw.ac.kr/ko/life/facility11.jsp"
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
-# ★★★ [테스트 설정] ★★★
-TEST_DATE = date(2026, 2, 20) 
-
 def send_telegram(message):
     if TOKEN and CHAT_ID:
         try:
@@ -37,14 +34,69 @@ def send_telegram(message):
         except Exception as e:
             print(f"텔레그램 전송 실패: {e}")
 
-def get_cafeteria_menu():
-    return "😴 (학사일정 테스트 중이라 식단 정보는 생략합니다)"
-
 def get_day_kor(date_obj):
     """ 날짜 객체를 받아서 한국어 요일(월~일) 반환 """
     days = ["월", "화", "수", "목", "금", "토", "일"]
     return days[date_obj.weekday()]
 
+# -----------------------------------------------------------
+# [기능 1] 학식 식단 가져오기 (실전 모드 복구)
+# -----------------------------------------------------------
+def get_cafeteria_menu():
+    try:
+        print(f"🍚 학식 정보 가져오는 중... ({MENU_URL})")
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        res = requests.get(MENU_URL, headers=headers, verify=False, timeout=10)
+        soup = BeautifulSoup(res.text, 'html.parser')
+        
+        # [실전] 진짜 오늘 날짜 사용
+        today_str = date.today().strftime("%Y-%m-%d")
+        
+        # 1. 오늘 날짜에 해당하는 '요일 컬럼 인덱스' 찾기
+        table = soup.select_one("table.tbl-list")
+        if not table:
+            return "❌ 식단표를 찾을 수 없습니다."
+
+        headers = table.select("thead th")
+        target_idx = -1
+        
+        for idx, th in enumerate(headers):
+            if today_str in th.get_text():
+                target_idx = idx
+                break
+        
+        if target_idx == -1:
+            return "😴 오늘은 운영하지 않거나 식단 정보가 없어요. (주말/공휴일)"
+
+        # 2. 해당 요일의 메뉴 가져오기
+        menu_rows = table.select("tbody tr")
+        menu_list = []
+        
+        for row in menu_rows:
+            cols = row.select("td")
+            if len(cols) <= target_idx: continue
+            
+            category = cols[0].get_text(" ", strip=True).split("판매시간")[0].strip()
+            menu_content = cols[target_idx].get_text("\n", strip=True)
+            
+            if menu_content:
+                menu_list.append(f"🍱 *{category}*\n{menu_content}")
+
+        if not menu_list:
+            return "🍙 등록된 식단 내용이 없습니다."
+            
+        return "\n\n".join(menu_list)
+
+    except Exception as e:
+        print(f"❌ 학식 파싱 에러: {e}")
+        return "⚠️ 식단 정보를 불러오는데 실패했습니다."
+
+# -----------------------------------------------------------
+# [기능 2] 학사일정 가져오기 (실전 모드)
+# -----------------------------------------------------------
 def get_academic_calendar():
     chrome_options = Options()
     chrome_options.add_argument("--headless") 
@@ -58,9 +110,11 @@ def get_academic_calendar():
     events_text = []
     
     try:
-        print(f"📅 학사일정 접속 중... (기준일: {TEST_DATE})")
-        driver.get(CALENDAR_URL)
+        # [실전] 진짜 오늘 날짜 사용
+        today = date.today()
+        print(f"📅 학사일정 접속 중... (기준일: {today})")
         
+        driver.get(CALENDAR_URL)
         try:
             WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, ".schedule-this-yearlist li"))
@@ -69,11 +123,8 @@ def get_academic_calendar():
             pass 
 
         time.sleep(1) 
-        
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         all_list_items = soup.find_all("li")
-        
-        today = TEST_DATE 
         
         today_events = []
         upcoming_events = []
@@ -102,7 +153,6 @@ def get_academic_calendar():
 
             # 1. 오늘의 일정
             if s_date <= today <= e_date:
-                # [수정] 괄호 제거: (~ 02.27(금)) -> ~ 02.27(금)
                 if s_date != e_date:
                     end_str = e_date.strftime("%m.%d")
                     end_day = get_day_kor(e_date)
@@ -126,7 +176,7 @@ def get_academic_calendar():
         else:
             events_text.append(f"🔔 *오늘의 일정*\n(일정이 없습니다)")
         
-        # 다가오는 일정 필터링
+        # 다가오는 일정 (가장 가까운 것만, 괄호 제거)
         if upcoming_events:
             upcoming_events.sort(key=lambda x: x['d_day'])
             min_d_day = upcoming_events[0]['d_day']
@@ -136,7 +186,8 @@ def get_academic_calendar():
             temp = ["\n⏳ *다가오는 일정*"]
             for e in nearest_events:
                 d_day_str = "D-DAY" if e['d_day'] == 0 else f"D-{e['d_day']}"
-                temp.append(f"[{d_day_str}] {e['title']} ({e['date']})")
+                # [수정] 괄호 제거: ({e['date']}) -> {e['date']}
+                temp.append(f"[{d_day_str}] {e['title']} {e['date']}")
             events_text.append("\n".join(temp))
             
     except Exception as e:
@@ -148,9 +199,9 @@ def get_academic_calendar():
     return "\n".join(events_text) if events_text else "• 예정된 주요 학사일정이 없습니다."
 
 def run():
-    print(f"🚀 모닝 브리핑 테스트 시작 (가상 기준일: {TEST_DATE})")
+    print("🚀 광운대 모닝 브리핑 실행 (실전 모드)")
     
-    today_str = TEST_DATE.strftime('%Y-%m-%d (%a)')
+    today_str = date.today().strftime('%Y-%m-%d (%a)')
     
     calendar_msg = get_academic_calendar()
     menu_msg = get_cafeteria_menu()
