@@ -1,0 +1,37 @@
+name: 30분 모니터링
+
+on:
+  
+  workflow_dispatch:       # 버튼 눌러서 수동 실행 가능
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # 저장소에 파일을 쓸 권한 부여
+    steps:
+      - name: 저장소 가져오기
+        uses: actions/checkout@v3
+
+      - name: 파이썬 설치
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: 라이브러리 설치
+        run: |
+          pip install requests beautifulsoup4
+
+      - name: 모니터링 실행
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python monitor.py
+
+      - name: 결과 저장 (변경시에만)
+        run: |
+          git config user.name "Auto Bot"
+          git config user.email "bot@github.com"
+          git add data.txt
+          git commit -m "Update data" || exit 0
+          git push
