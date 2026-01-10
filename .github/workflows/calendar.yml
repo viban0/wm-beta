@@ -1,8 +1,7 @@
 name: 학사일정 아침 브리핑
 
 on:
-  schedule:
-    - cron: '0 22 * * *'   # 매일 한국 시간 아침 7시 (UTC 22:00)
+  
   workflow_dispatch:       # 수동 실행 버튼
 
 jobs:
