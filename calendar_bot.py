@@ -102,11 +102,11 @@ def get_academic_calendar():
 
             # 1. 오늘의 일정
             if s_date <= today <= e_date:
-                # [수정] 기간이 있는 일정이라면 종료일 표시 (~ 02.27(금))
+                # [수정] 괄호 제거: (~ 02.27(금)) -> ~ 02.27(금)
                 if s_date != e_date:
                     end_str = e_date.strftime("%m.%d")
                     end_day = get_day_kor(e_date)
-                    today_events.append(f"• {title} (~ {end_str}({end_day}))")
+                    today_events.append(f"• {title} ~ {end_str}({end_day})")
                 else:
                     today_events.append(f"• {title}")
             
@@ -126,12 +126,11 @@ def get_academic_calendar():
         else:
             events_text.append(f"🔔 *오늘의 일정*\n(일정이 없습니다)")
         
-        # [수정] 다가오는 일정 필터링 (가장 가까운 D-Day만, 동률 포함)
+        # 다가오는 일정 필터링
         if upcoming_events:
-            upcoming_events.sort(key=lambda x: x['d_day']) # D-Day 오름차순 정렬
-            min_d_day = upcoming_events[0]['d_day'] # 가장 가까운 D-Day 값 (예: 3)
+            upcoming_events.sort(key=lambda x: x['d_day'])
+            min_d_day = upcoming_events[0]['d_day']
             
-            # min_d_day와 같은 일정만 남김
             nearest_events = [e for e in upcoming_events if e['d_day'] == min_d_day]
             
             temp = ["\n⏳ *다가오는 일정*"]
@@ -156,7 +155,6 @@ def run():
     calendar_msg = get_academic_calendar()
     menu_msg = get_cafeteria_menu()
     
-    # [수정] 괄호 제거, 전체 일정 링크 위치 변경
     final_msg = f"☀️ *광운대 모닝 브리핑* {today_str}\n\n" \
                 f"{calendar_msg}\n\n" \
                 f"[👉 전체 일정 보기]({CALENDAR_URL})\n" \
