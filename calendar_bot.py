@@ -163,7 +163,7 @@ def get_academic_calendar():
             # 2. 다가오는 일정
             elif s_date > today:
                 d_day = (s_date - today).days
-                if d_day <= 14: 
+                if d_day <= 50: 
                     upcoming_events.append({
                         "date": raw_date,
                         "title": title,
