@@ -11,9 +11,7 @@ CALENDAR_API_URL = "https://www.kw.ac.kr/KWBoard/list5_detail.jsp"
 CALENDAR_PAGE_URL = "https://www.kw.ac.kr/ko/life/bachelor_calendar.jsp"
 MENU_URL = "https://www.kw.ac.kr/ko/life/facility11.jsp"
 NOTICE_URL = "https://www.kw.ac.kr/ko/life/notice.jsp"
-
-# ★ [수정 필요] 여기에 운영 중인 텔레그램 그룹/채널 링크를 넣으세요!
-FEEDBACK_GROUP_URL = "https://t.me/여기에_링크_입력"
+FEEDBACK_GROUP_URL = "https://t.me/+p-QVo1Z6e5AxNTdl"
 
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
@@ -214,7 +212,7 @@ def run():
                     f"{calendar_msg}\n\n" \
                     f"────────────────\n\n" \
                     f"🥄 *오늘의 학식*\n\n" \
-                    f"{menu_msg}"
+                    f"{menu_msg}\n"
         
         # [수정] 버튼 이름 변경 (피드백)
         keyboard = {
