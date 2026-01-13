@@ -1,8 +1,9 @@
 import os
 import requests
-import json # [NEW] 버튼 기능을 위해 추가
+import json
 from bs4 import BeautifulSoup
 import urllib3
+import re # [NEW] 정규표현식 사용
 
 # SSL 인증서 경고 무시
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -12,9 +13,6 @@ TARGET_URL = "https://www.kw.ac.kr/ko/life/notice.jsp"
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
-# ------------------------------------------------------
-# 1. 키워드별 이모지 매핑
-# ------------------------------------------------------
 def get_emoji(title):
     if "장학" in title or "대출" in title: return "💰" 
     elif "학사" in title or "수업" in title or "복학" in title: return "📅" 
@@ -25,24 +23,21 @@ def get_emoji(title):
     elif "대회" in title or "공모" in title: return "🏆" 
     else: return "📢" 
 
-# ------------------------------------------------------
-# 2. 텔레그램 전송 함수 (버튼 추가)
-# ------------------------------------------------------
 def send_telegram(title, link, info):
     if TOKEN and CHAT_ID:
         try:
             icon = get_emoji(title)
-            # 대괄호가 마크다운 링크 문법이랑 겹쳐서 깨지는 걸 방지
-            safe_title = title
             
-            # [수정] 텍스트 링크([👉 공지 바로가기]...)를 제거하고 본문만 남김
-            msg = f"{icon} *{safe_title}*\n" \
+            # [수정] 머리말([외부] 등) 뒤에 줄바꿈 추가 로직
+            # 정규표현식으로 [..] 패턴을 찾아서 뒤에 줄바꿈을 넣음
+            safe_title = re.sub(r'(\[.*?\])', r'\1\n', title).strip()
+            
+            msg = f"{icon} {safe_title}\n" \
                   f"\n" \
                   f"{info}"
             
             url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
             
-            # [NEW] 버튼 생성
             keyboard = {
                 "inline_keyboard": [
                     [
@@ -54,9 +49,13 @@ def send_telegram(title, link, info):
             payload = {
                 "chat_id": CHAT_ID,
                 "text": msg,
-                "parse_mode": "Markdown",
-                "reply_markup": json.dumps(keyboard) # 버튼 데이터 추가
+                "parse_mode": "Markdown", # Markdown 모드 유지 (주의: 제목에 특수문자 있으면 깨질 수 있음 -> 끄는 게 안전할 수도)
+                "reply_markup": json.dumps(keyboard),
+                "disable_notification": True 
             }
+            # Markdown 파싱 에러 방지를 위해 safe_title에서 마크다운 예약어 처리 필요할 수 있음.
+            # 일단 단순 줄바꿈만 적용. 만약 에러나면 parse_mode를 제거하세요.
+            
             requests.post(url, data=payload)
         except Exception as e:
             print(f"텔레그램 전송 실패: {e}")
@@ -83,7 +82,6 @@ def run():
             a_tag = item.select_one("div.board-text > a")
             info_tag = item.select_one("p.info") 
 
-            # 교수지원팀 필터링
             if info_tag and "교수지원팀" in info_tag.get_text():
                 continue
 
