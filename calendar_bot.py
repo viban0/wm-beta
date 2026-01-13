@@ -77,7 +77,7 @@ def get_cafeteria_menu():
             cols = row.select("td")
             if len(cols) <= target_idx: continue
             
-            category = cols[0].get_text(" ", strip=True).split("판매시간")[0].strip()
+            category = cols[0].get_text("\n", strip=True).split("판매시간")[0].strip()
             menu_content = cols[target_idx].get_text("\n", strip=True)
             
             if menu_content:
@@ -210,9 +210,10 @@ def run():
         # [수정] 제목 변경 (광운대 삭제), 날씨 삭제
         final_msg = f"☀️ *모닝 브리핑* {today_str}\n\n" \
                     f"{calendar_msg}\n\n" \
-                    f"────────────────\n\n" \
+                    f"────────────────\n" \
                     f"🥄 *오늘의 학식*\n\n" \
                     f"{menu_msg}\n"
+                    f" "
         
         # [수정] 버튼 이름 변경 (피드백)
         keyboard = {
@@ -222,8 +223,8 @@ def run():
                     {"text": "🍙 전체 식단표", "url": MENU_URL}
                 ],
                 [
-                    {"text": "📢 학교 공지사항", "url": NOTICE_URL},
-                    {"text": "피드백", "url": FEEDBACK_GROUP_URL}
+                    {"text": "📢 전체 공지사항", "url": NOTICE_URL},
+                    {"text": "🗣️ 피드백", "url": FEEDBACK_GROUP_URL}
                 ]
             ]
         }
