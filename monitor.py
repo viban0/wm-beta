@@ -33,7 +33,7 @@ def send_telegram(title, link, info):
         try:
             icon = get_emoji(title)
             # 대괄호가 마크다운 링크 문법이랑 겹쳐서 깨지는 걸 방지
-            safe_title = title.replace("[", "(").replace("]", ")")
+            safe_title = title
             
             # [수정] 텍스트 링크([👉 공지 바로가기]...)를 제거하고 본문만 남김
             msg = f"{icon} *{safe_title}*\n" \
