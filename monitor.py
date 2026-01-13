@@ -4,6 +4,7 @@ import json
 from bs4 import BeautifulSoup
 import urllib3
 import re
+import html # [NEW] HTML 특수문자 처리를 위해 추가
 
 # SSL 인증서 경고 무시
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -32,15 +33,12 @@ def send_telegram(title, link, info):
             # 예: "[외부] 제목" -> "[외부]\n제목"
             temp_title = re.sub(r'(?<=\])\s*', '\n', title).strip()
             
-            # 2. ★핵심 수정★ 대괄호 이스케이프 처리
-            # 텔레그램 마크다운에서 [ ]가 사라지지 않도록 \[ \]로 변경
-            safe_title = temp_title.replace("[", "\\[").replace("]", "\\]")
-            
-            # 만약 Regex 매칭이 안 돼서 빈 문자열이면 원본 사용 (안전장치)
-            if not safe_title:
-                safe_title = title.replace("[", "\\[").replace("]", "\\]")
+            # 2. [NEW] HTML 이스케이프 처리
+            # 제목에 <, >, & 같은 문자가 있으면 HTML 태그로 오해해서 에러가 날 수 있으므로 변환합니다.
+            safe_title = html.escape(temp_title)
 
-            msg = f"{icon} *{safe_title}*\n" \
+            # 3. [NEW] HTML 태그로 볼드체(굵게) 적용 (<b>...</b>)
+            msg = f"{icon} <b>{safe_title}</b>\n" \
                   f"\n" \
                   f"{info}"
             
@@ -57,7 +55,7 @@ def send_telegram(title, link, info):
             payload = {
                 "chat_id": CHAT_ID,
                 "text": msg,
-                "parse_mode": "Markdown", 
+                "parse_mode": "HTML", # [핵심] Markdown 대신 HTML 모드 사용!
                 "reply_markup": json.dumps(keyboard),
                 "disable_notification": True 
             }
