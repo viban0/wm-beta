@@ -28,16 +28,19 @@ def send_telegram(title, link, info):
         try:
             icon = get_emoji(title)
             
-            # [수정] 대괄호([])는 유지하고, 그 뒤에 줄바꿈(\n)을 추가
+            # 1. [머리말] 뒤에 줄바꿈 추가 (Regex)
             # 예: "[외부] 제목" -> "[외부]\n제목"
-            # (?<=\]) : ']' 바로 뒤를 찾음 (Lookbehind)
-            safe_title = re.sub(r'(?<=\])\s*', '\n', title).strip()
+            temp_title = re.sub(r'(?<=\])\s*', '\n', title).strip()
             
-            # 만약 [..]가 없으면 그냥 원래 제목 그대로 출력됨
+            # 2. ★핵심 수정★ 대괄호 이스케이프 처리
+            # 텔레그램 마크다운에서 [ ]가 사라지지 않도록 \[ \]로 변경
+            safe_title = temp_title.replace("[", "\\[").replace("]", "\\]")
+            
+            # 만약 Regex 매칭이 안 돼서 빈 문자열이면 원본 사용 (안전장치)
             if not safe_title:
-                safe_title = title
+                safe_title = title.replace("[", "\\[").replace("]", "\\]")
 
-            msg = f"{icon} {safe_title}\n" \
+            msg = f"{icon} *{safe_title}*\n" \
                   f"\n" \
                   f"{info}"
             
@@ -54,22 +57,10 @@ def send_telegram(title, link, info):
             payload = {
                 "chat_id": CHAT_ID,
                 "text": msg,
-                "parse_mode": "Markdown", # Markdown 유지 (대괄호 깨짐 주의 필요)
-                # 만약 [ ] 때문에 Markdown 에러가 계속 나면 아래처럼 끄는 게 안전함
-                # "parse_mode": "", 
+                "parse_mode": "Markdown", 
                 "reply_markup": json.dumps(keyboard),
                 "disable_notification": True 
             }
-            
-            # [안전장치] Markdown 모드에서 [ ]는 링크로 인식될 수 있어서 에러 발생 가능성 있음.
-            # 제목에 [ ]가 있다면 Markdown 모드를 끄거나, 이스케이프 처리가 필요함.
-            # 여기서는 안전하게 Markdown 모드를 끄는 것을 추천하지만, 
-            # 일단은 *굵게* 효과를 위해 놔두고, 에러나면 safe_title을 escape 처리해야 함.
-            
-            # 대괄호 이스케이프 처리 (마크다운 깨짐 방지)
-            # safe_title = safe_title.replace("[", "\\[").replace("]", "\\]")
-            # 위 주석을 풀면 [ ]가 그대로 나오면서 에러도 안 납니다.
-            
             requests.post(url, data=payload)
         except Exception as e:
             print(f"텔레그램 전송 실패: {e}")
