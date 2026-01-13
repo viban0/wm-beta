@@ -179,7 +179,7 @@ def get_academic_calendar():
         events_text.append(f"🔔 *오늘의 일정*\n" + "\n".join(today_events))
     else:
         # [수정] 멘트 변경 (부드럽게)
-        events_text.append(f"🔔 *오늘의 일정*\n(오늘은 예정된 일정이 없어요 🌿)")
+        events_text.append(f"🔔 *오늘의 일정*\n 오늘은 예정된 일정이 없어요 🌿")
     
     if upcoming_events:
         upcoming_events.sort(key=lambda x: x['d_day'])
