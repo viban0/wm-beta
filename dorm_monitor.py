@@ -36,26 +36,36 @@ def send_telegram(title, date, link):
         except Exception as e:
             print(f"텔레그램 전송 실패: {e}")
 
-# [핵심 기능] JSON 안에 숨어있는 특정 키(key_name)의 리스트를 몽땅 찾아내는 함수
-def find_all_by_key(data, target_key):
-    found_items = []
+# [핵심 기능] 성공했던 "재귀 탐색" 함수 복구!
+# 키 이름(noticeList 등)을 몰라도, 내용물(seq, subject)이 있으면 무조건 찾아냅니다.
+def find_posts_recursively(data, found_posts):
     if isinstance(data, dict):
-        for key, value in data.items():
-            # 키 이름이 같고, 내용물이 리스트면 확보!
-            if key == target_key and isinstance(value, list):
-                found_items.extend(value)
-            # 아니면 더 깊이 들어가서 찾기
-            else:
-                found_items.extend(find_all_by_key(value, target_key))
+        # 대소문자 무관하게 키 검사
+        keys = {k.lower(): k for k in data.keys()}
+        seq_key = keys.get('seq')
+        subj_key = keys.get('subject') or keys.get('title') or keys.get('nttsj')
+        
+        # 게시글 형태(ID와 제목이 있음)라면 확보!
+        if seq_key and subj_key:
+            found_posts.append({
+                'id': str(data[seq_key]),
+                'title': data[subj_key],
+                'date': data.get('regdate') or data.get('REGDATE') or '날짜 미상'
+            })
+            return 
+
+        # 게시글이 아니면 더 깊이 탐색
+        for v in data.values():
+            find_posts_recursively(v, found_posts)
+            
     elif isinstance(data, list):
         for item in data:
-            found_items.extend(find_all_by_key(item, target_key))
-    return found_items
+            find_posts_recursively(item, found_posts)
 
 def run():
     print(f"🚀 행복기숙사 공지 스캔 시작...")
 
-    # [설정] 일반 공지 20개 요청 (고정 공지는 서버가 알아서 줌)
+    # [설정] 일반 공지는 20개만 요청 (고정 공지는 서버가 주는 대로 다 받음)
     data = {
         'cPage': '1',
         'rows': '20', 
@@ -80,45 +90,35 @@ def run():
             print(f"❌ 응답이 JSON이 아닙니다!")
             return
 
-        # 1. 고정 공지(noticeList) 찾기 - 어디에 있든 찾아냄!
-        sticky_raw = find_all_by_key(result, 'noticeList')
-        print(f"📌 고정 공지(noticeList) 발견: {len(sticky_raw)}개")
-
-        # 2. 일반 공지(list) 찾기 - 어디에 있든 찾아냄!
-        general_raw = find_all_by_key(result, 'list')
-        print(f"📄 일반 공지(list) 발견: {len(general_raw)}개")
-
-        # 3. 순서대로 합치기 (고정 공지 먼저 + 일반 공지 나중) -> 사이트 순서 구현
-        all_raw_posts = sticky_raw + general_raw
+        # 1. 성공했던 방식(재귀 탐색)으로 모든 게시글 긁어오기
+        all_found_posts = []
+        find_posts_recursively(result, all_found_posts)
         
-        print(f"🔍 전체 확보한 게시글: {len(all_raw_posts)}개")
+        print(f"🔍 발견된 전체 데이터: {len(all_found_posts)}개 (고정+일반 포함)")
 
-        # 4. 데이터 정제
+        # 2. 데이터 정제 및 리스트 생성
         current_posts = []
-        for post in all_raw_posts:
-            if not isinstance(post, dict): continue
-
-            title = post.get('subject') or post.get('SUBJECT') or post.get('nttSj') or post.get('title')
-            if not title: continue 
-
-            date = post.get('regdate') or post.get('REGDATE') or post.get('date') or '날짜 미상'
-            seq = post.get('seq') or post.get('SEQ') or post.get('id')
+        for post in all_found_posts:
+            if not post['id']: continue
             
-            if not seq: continue
+            # 링크 추가
+            post['link'] = VIEW_URL
+            current_posts.append(post)
 
-            fingerprint = str(seq)
-            current_posts.append({
-                "id": fingerprint,
-                "title": title,
-                "date": date,
-                "link": VIEW_URL
-            })
+        # 3. 중복 제거 (ID 기준)
+        # 딕셔너리 컴프리헨션을 이용해 중복 ID 제거
+        unique_posts_dict = {p['id']: p for p in current_posts}
+        unique_posts = list(unique_posts_dict.values())
 
-        # 5. 중복 제거 (순서 유지: 앞에서 이미 나온 고정 공지는 살리고, 뒤에 나온 중복은 제거)
-        unique_posts = list({p['id']: p for p in current_posts}.values())
+        # 4. [핵심] ID 내림차순 정렬 (최신글이 맨 위로)
+        # 8340(고정)이 8335(일반)보다 숫자가 크므로, 정렬하면 자연스럽게 맨 위로 옵니다.
+        unique_posts.sort(key=lambda x: int(x['id']), reverse=True)
 
-        if unique_posts:
-            print(f"📝 파일 저장 순서: 상단 {unique_posts[0]['id']} ... 하단 {unique_posts[-1]['id']}")
+        # 5. [설정 적용] 상위 20개만 자르기
+        final_posts = unique_posts[:20]
+
+        if final_posts:
+            print(f"📝 저장 범위: 상단 {final_posts[0]['id']} ... 하단 {final_posts[-1]['id']} (총 {len(final_posts)}개)")
         
         old_posts = []
         if os.path.exists("dorm_data.txt"):
@@ -127,8 +127,8 @@ def run():
 
         save_data = []
         
-        # 순서대로 저장 (고정 -> 일반)
-        for post in unique_posts:
+        # 알림 전송 및 저장
+        for post in final_posts:
             save_data.append(post["id"])
             if not old_posts: continue
             
@@ -143,7 +143,7 @@ def run():
             for pid in save_data:
                 f.write(pid + "\n")
         
-        print("💾 dorm_data.txt 업데이트 완료 (사이트 순서 적용)")
+        print("💾 dorm_data.txt 업데이트 완료")
 
     except Exception as e:
         print(f"❌ 오류 발생: {e}")
