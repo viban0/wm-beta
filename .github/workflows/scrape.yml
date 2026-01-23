@@ -37,6 +37,15 @@ jobs:
         run: |
           git config user.name "Auto Bot"
           git config user.email "bot@github.com"
-          git add data.txt
+          
+          # [수정 1] dorm_data.txt 도 같이 저장하도록 추가!
+          git add data.txt dorm_data.txt
+          
+          # 변경사항이 있으면 커밋, 없으면 0으로 종료(에러 안 냄)
           git commit -m "Update data" || exit 0
+          
+          # [수정 2] ★핵심★ 충돌 방지를 위해 서버 내용을 먼저 가져옴 (rebase)
+          git pull --rebase origin main
+          
+          # 그 다음 밀어넣기
           git push
