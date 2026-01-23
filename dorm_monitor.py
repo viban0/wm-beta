@@ -38,9 +38,10 @@ def send_telegram(title, date, link):
 def run():
     print(f"🚀 행복기숙사 공지 스캔 시작...")
 
+    # [수정 1] rows를 10 -> 50으로 변경 (고정 공지에 밀린 새 글을 찾기 위해)
     data = {
         'cPage': '1',
-        'rows': '10',
+        'rows': '50', 
         'bbs_locgbn': 'KW',
         'bbs_id': 'notice',
         'sType': '', 
@@ -68,7 +69,6 @@ def run():
         if isinstance(result, list):
             post_list = result
         elif isinstance(result, dict):
-            # 'root', 'list' 등의 키를 찾음
             possible_keys = ['root', 'list', 'List', 'rows', 'data', 'resultList']
             for key in possible_keys:
                 if key in result:
@@ -76,29 +76,28 @@ def run():
                     print(f"🔑 '{key}' 키에서 데이터 1차 발견!")
                     break
         
-        # [NEW] 2차 포장 뜯기 (핵심!)
-        # 만약 리스트가 1개뿐이고, 그 안에 또 'list' 같은 키가 있다면? -> 그게 진짜다!
+        # 2. 2차 포장 뜯기 (필요시)
         if len(post_list) == 1 and isinstance(post_list[0], dict):
             first_item = post_list[0]
-            # 안에 리스트가 또 들어있는지 확인
             nested_keys = ['list', 'List', 'detail', 'subList']
             for n_key in nested_keys:
                 if n_key in first_item and isinstance(first_item[n_key], list):
                     print(f"📦 '{n_key}' 안에 숨겨진 진짜 리스트를 찾았습니다! 포장을 뜯습니다.")
                     post_list = first_item[n_key]
                     break
-            
-            # 만약 포장을 못 뜯었다면, 디버깅을 위해 키 목록 출력
-            if len(post_list) == 1: 
-                print(f"⚠️ 여전히 데이터가 1개입니다. 이 데이터의 키 목록: {list(first_item.keys())}")
 
         print(f"🔍 최종 확보한 게시글: {len(post_list)}개")
 
-        # 데이터 처리
         current_posts = []
         for post in post_list:
-            # 제목/날짜/ID 찾기 (대소문자 다양하게 시도)
-            title = post.get('subject') or post.get('SUBJECT') or post.get('title') or '제목 없음'
+            # [수정 2] 제목 키 찾기 강화 (subject, nttSj 등 다양한 케이스 대비)
+            title = post.get('subject') or post.get('SUBJECT') or post.get('nttSj') or post.get('title')
+            
+            # 제목이 없으면 로그에 해당 데이터의 키를 출력해 디버깅 돕기
+            if not title:
+                # print(f"⚠️ 제목을 못 찾음. 사용 가능한 키: {list(post.keys())}") # 로그 너무 길어질까봐 주석
+                title = "제목 없음"
+
             date = post.get('regdate') or post.get('REGDATE') or post.get('date') or '날짜 미상'
             seq = post.get('seq') or post.get('SEQ') or post.get('id')
             
@@ -118,6 +117,7 @@ def run():
                 old_posts = [line.strip() for line in f.readlines() if line.strip()]
 
         save_data = []
+        # 최신 글이 리스트 앞쪽에 있으므로 순서대로 저장
         for post in current_posts:
             save_data.append(post["id"])
             if not old_posts: continue
