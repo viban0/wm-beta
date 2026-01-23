@@ -18,7 +18,7 @@ def send_telegram(title, date, link):
     if TOKEN and CHAT_ID:
         try:
             safe_title = html.escape(title)
-            # 날짜 형식 통일
+            # 요청하신 깔끔한 레이아웃 적용
             msg = f"🏠 <b>[행복기숙사] {safe_title}</b>\n\n" \
                   f"| 작성일 {date}"
             
@@ -37,9 +37,36 @@ def send_telegram(title, date, link):
         except Exception as e:
             print(f"텔레그램 전송 실패: {e}")
 
-def run():
-    print(f"🚀 행복기숙사 공지 스캔 시작...")
+# [핵심] 재귀적으로 모든 데이터를 뒤져서 게시글(seq+subject)을 찾아내는 함수
+def find_posts_recursively(data, found_posts):
+    if isinstance(data, dict):
+        # 1. 딕셔너리인데 'seq'와 'subject'가 있다? -> 게시글 당첨!
+        # (키 이름은 대소문자 무관하게 체크)
+        keys = {k.lower(): k for k in data.keys()}
+        seq_key = keys.get('seq')
+        subj_key = keys.get('subject') or keys.get('title') or keys.get('nttsj')
+        
+        if seq_key and subj_key:
+            found_posts.append({
+                'seq': data[seq_key],
+                'subject': data[subj_key],
+                'regdate': data.get('regdate') or data.get('REGDATE') or '날짜 미상'
+            })
+            return # 찾았으면 더 깊이 안 들어가도 됨 (단, 중첩 구조가 아니라는 가정 하에)
 
+        # 2. 게시글이 아니면 내부 값을 더 뒤져본다
+        for v in data.values():
+            find_posts_recursively(v, found_posts)
+            
+    elif isinstance(data, list):
+        # 3. 리스트면 안에 있는거 하나하나 다 뒤져본다
+        for item in data:
+            find_posts_recursively(item, found_posts)
+
+def run():
+    print(f"🚀 행복기숙사 공지 정밀 스캔 시작...")
+
+    # 고정 공지가 많을 수 있으니 50개 요청 유지
     data = {
         'cPage': '1',
         'rows': '50', 
@@ -64,40 +91,18 @@ def run():
             print(f"❌ 응답이 JSON이 아닙니다!")
             return
 
-        all_raw_posts = []
-
-        # [핵심 수정] 모든 키를 뒤져서 리스트란 리스트는 다 합친다!
-        # 1. 최상위가 리스트인 경우
-        if isinstance(result, list):
-            all_raw_posts.extend(result)
+        # [수정] 구조 상관없이 싹 다 찾기 (DFS 탐색)
+        found_raw_posts = []
+        find_posts_recursively(result, found_raw_posts)
         
-        # 2. 최상위가 딕셔너리인 경우 ('root' 등을 찾음)
-        elif isinstance(result, dict):
-            # 'root' 같은 포장지가 있으면 한 꺼풀 벗김
-            target_data = result
-            if 'root' in result and isinstance(result['root'], dict):
-                target_data = result['root']
-                print("📦 'root' 포장지를 벗겼습니다.")
+        print(f"🔍 발견된 데이터 조각: {len(found_raw_posts)}개")
 
-            # 이제 target_data 안에 있는 모든 리스트(list, noticeList 등)를 싹 긁어모음
-            for key, value in target_data.items():
-                if isinstance(value, list):
-                    # 리스트 안에 내용물이 있고, 그게 게시글(딕셔너리)처럼 생겼으면 추가
-                    if len(value) > 0 and isinstance(value[0], dict):
-                        print(f"🔍 '{key}' 키에서 게시글 {len(value)}개 발견! 합칩니다.")
-                        all_raw_posts.extend(value)
-
-        print(f"∑ 총 수집된 데이터: {len(all_raw_posts)}개")
-
-        # 3. 데이터 정제
+        # 데이터 정제
         current_posts = []
-        for post in all_raw_posts:
-            # 제목/날짜/ID 추출
-            title = post.get('subject') or post.get('SUBJECT') or post.get('nttSj') or post.get('title')
-            if not title: continue # 제목 없으면 패스
-
-            date = post.get('regdate') or post.get('REGDATE') or post.get('date') or '날짜 미상'
-            seq = post.get('seq') or post.get('SEQ') or post.get('id')
+        for post in found_raw_posts:
+            title = post['subject']
+            date = post['regdate']
+            seq = post['seq']
             
             if not seq: continue
 
@@ -109,15 +114,18 @@ def run():
                 "link": VIEW_URL
             })
 
-        # [중복 제거] noticeList와 list에 같은 글이 있을 수도 있으니 ID 기준으로 중복 제거
-        # 딕셔너리 컴프리헨션을 이용해 ID를 키로 하여 중복 제거 후 다시 리스트로 변환
+        # [중복 제거] noticeList와 list에 같은 글이 있을 수 있으므로 ID 기준 제거
         unique_posts_dict = {p['id']: p for p in current_posts}
         unique_posts = list(unique_posts_dict.values())
 
-        # [정렬] ID 기준 내림차순 (최신글이 맨 위로) -> 8340이 8335보다 위로 옴!
+        # [정렬] ID 기준 내림차순 (8340 > 8335)
+        # 최신 글(번호가 큰 글)이 리스트 앞쪽에 오도록 정렬
         unique_posts.sort(key=lambda x: int(x['id']), reverse=True)
-        
-        print(f"🧹 중복 제거 및 정렬 후 게시글: {len(unique_posts)}개 (최신 ID: {unique_posts[0]['id'] if unique_posts else '없음'})")
+
+        if unique_posts:
+            print(f"🧹 정제 후 게시글: {len(unique_posts)}개 (최신 ID: {unique_posts[0]['id']})")
+        else:
+            print("⚠️ 정제 후 게시글이 0개입니다. 구조가 완전히 다를 수 있습니다.")
 
         old_posts = []
         if os.path.exists("dorm_data.txt"):
