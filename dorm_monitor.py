@@ -38,7 +38,6 @@ def send_telegram(title, date, link):
 def run():
     print(f"🚀 행복기숙사 공지 스캔 시작...")
 
-    # [수정 1] sType 추가 (빈 값이라도 보내야 함)
     data = {
         'cPage': '1',
         'rows': '10',
@@ -57,7 +56,6 @@ def run():
     try:
         res = requests.post(API_URL, data=data, headers=headers, verify=False, timeout=10)
         
-        # JSON 응답 받기
         try:
             result = res.json()
         except ValueError:
@@ -66,37 +64,41 @@ def run():
 
         post_list = []
 
-        # [수정 2] 응답 구조 자동 탐지 (스마트 로직)
+        # 1. 1차 구조 탐색
         if isinstance(result, list):
-            # 1. 만약 응답이 바로 리스트([...])라면 그대로 사용
-            print("✅ 응답 형태: 리스트(List) 감지됨")
             post_list = result
         elif isinstance(result, dict):
-            # 2. 딕셔너리라면 흔한 키 이름들을 순서대로 확인
-            print(f"✅ 응답 형태: 딕셔너리(Dict) 감지됨. 키 목록: {list(result.keys())}")
-            
-            # 찾을 후보 키 이름들
-            possible_keys = ['list', 'List', 'root', 'rows', 'data', 'resultList']
-            
-            found_key = None
+            # 'root', 'list' 등의 키를 찾음
+            possible_keys = ['root', 'list', 'List', 'rows', 'data', 'resultList']
             for key in possible_keys:
                 if key in result:
-                    found_key = key
+                    post_list = result[key]
+                    print(f"🔑 '{key}' 키에서 데이터 1차 발견!")
+                    break
+        
+        # [NEW] 2차 포장 뜯기 (핵심!)
+        # 만약 리스트가 1개뿐이고, 그 안에 또 'list' 같은 키가 있다면? -> 그게 진짜다!
+        if len(post_list) == 1 and isinstance(post_list[0], dict):
+            first_item = post_list[0]
+            # 안에 리스트가 또 들어있는지 확인
+            nested_keys = ['list', 'List', 'detail', 'subList']
+            for n_key in nested_keys:
+                if n_key in first_item and isinstance(first_item[n_key], list):
+                    print(f"📦 '{n_key}' 안에 숨겨진 진짜 리스트를 찾았습니다! 포장을 뜯습니다.")
+                    post_list = first_item[n_key]
                     break
             
-            if found_key:
-                post_list = result[found_key]
-                print(f"🔑 '{found_key}' 키에서 데이터 발견!")
-            else:
-                print(f"⚠️ 데이터를 담은 키를 찾지 못했습니다. 구조 확인이 필요합니다.")
-        
-        print(f"🔍 가져온 게시글: {len(post_list)}개")
+            # 만약 포장을 못 뜯었다면, 디버깅을 위해 키 목록 출력
+            if len(post_list) == 1: 
+                print(f"⚠️ 여전히 데이터가 1개입니다. 이 데이터의 키 목록: {list(first_item.keys())}")
+
+        print(f"🔍 최종 확보한 게시글: {len(post_list)}개")
 
         # 데이터 처리
         current_posts = []
         for post in post_list:
-            # 제목과 날짜 키 찾기 (subject, regdate가 일반적이지만 다를 수 있음)
-            title = post.get('subject') or post.get('TITLE') or post.get('title') or '제목 없음'
+            # 제목/날짜/ID 찾기 (대소문자 다양하게 시도)
+            title = post.get('subject') or post.get('SUBJECT') or post.get('title') or '제목 없음'
             date = post.get('regdate') or post.get('REGDATE') or post.get('date') or '날짜 미상'
             seq = post.get('seq') or post.get('SEQ') or post.get('id')
             
