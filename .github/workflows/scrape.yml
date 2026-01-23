@@ -27,7 +27,12 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python monitor.py
-
+      # ▼ [NEW] 기숙사 모니터링 추가 ▼
+      - name: 기숙사 공지 모니터링 실행
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python dorm_monitor.py
       - name: 결과 저장 (변경시에만)
         run: |
           git config user.name "Auto Bot"
