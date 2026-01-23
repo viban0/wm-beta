@@ -18,7 +18,6 @@ def send_telegram(title, date, link):
     if TOKEN and CHAT_ID:
         try:
             safe_title = html.escape(title)
-            # 요청하신 깔끔한 레이아웃 적용
             msg = f"🏠 <b>[행복기숙사] {safe_title}</b>\n\n" \
                   f"| 작성일 {date}"
             
@@ -37,39 +36,13 @@ def send_telegram(title, date, link):
         except Exception as e:
             print(f"텔레그램 전송 실패: {e}")
 
-# [핵심] 재귀적으로 모든 데이터를 뒤져서 게시글(seq+subject)을 찾아내는 함수
-def find_posts_recursively(data, found_posts):
-    if isinstance(data, dict):
-        # 1. 딕셔너리인데 'seq'와 'subject'가 있다? -> 게시글 당첨!
-        # (키 이름은 대소문자 무관하게 체크)
-        keys = {k.lower(): k for k in data.keys()}
-        seq_key = keys.get('seq')
-        subj_key = keys.get('subject') or keys.get('title') or keys.get('nttsj')
-        
-        if seq_key and subj_key:
-            found_posts.append({
-                'seq': data[seq_key],
-                'subject': data[subj_key],
-                'regdate': data.get('regdate') or data.get('REGDATE') or '날짜 미상'
-            })
-            return # 찾았으면 더 깊이 안 들어가도 됨 (단, 중첩 구조가 아니라는 가정 하에)
-
-        # 2. 게시글이 아니면 내부 값을 더 뒤져본다
-        for v in data.values():
-            find_posts_recursively(v, found_posts)
-            
-    elif isinstance(data, list):
-        # 3. 리스트면 안에 있는거 하나하나 다 뒤져본다
-        for item in data:
-            find_posts_recursively(item, found_posts)
-
 def run():
-    print(f"🚀 행복기숙사 공지 정밀 스캔 시작...")
+    print(f"🚀 행복기숙사 공지 스캔 시작...")
 
-    # 고정 공지가 많을 수 있으니 50개 요청 유지
+    # [수정 1] 요청 개수를 20개로 줄임 (고정공지 약 13개 + 최신글 @)
     data = {
         'cPage': '1',
-        'rows': '50', 
+        'rows': '20', 
         'bbs_locgbn': 'KW',
         'bbs_id': 'notice',
         'sType': '', 
@@ -91,18 +64,59 @@ def run():
             print(f"❌ 응답이 JSON이 아닙니다!")
             return
 
-        # [수정] 구조 상관없이 싹 다 찾기 (DFS 탐색)
-        found_raw_posts = []
-        find_posts_recursively(result, found_raw_posts)
-        
-        print(f"🔍 발견된 데이터 조각: {len(found_raw_posts)}개")
+        all_raw_posts = []
 
-        # 데이터 정제
+        # [수정 2] 사이트 보이는 순서(고정공지 -> 일반공지)를 유지하기 위해 순차적으로 추출
+        # 서버가 보통 { root: [ { noticeList: [...], list: [...] } ] } 형태로 줌
+        
+        target_root = None
+        
+        # 1. 구조 파악 및 진입
+        if isinstance(result, list):
+            if len(result) > 0 and isinstance(result[0], dict):
+                target_root = result[0] # 리스트의 첫 번째 요소가 진짜 데이터 뭉치
+            else:
+                all_raw_posts = result # 그냥 리스트 자체가 데이터일 경우
+        elif isinstance(result, dict):
+            # 'root' 키가 있으면 그 안으로 진입
+            if 'root' in result:
+                if isinstance(result['root'], list) and len(result['root']) > 0:
+                    target_root = result['root'][0]
+                else:
+                    target_root = result['root']
+            else:
+                target_root = result # 그냥 딕셔너리 자체가 데이터
+
+        # 2. 순서대로 담기 (noticeList 먼저, 그 다음 list)
+        if target_root and isinstance(target_root, dict):
+            # (1) 고정 공지 (상단)
+            if 'noticeList' in target_root and isinstance(target_root['noticeList'], list):
+                print(f"📌 고정 공지(noticeList) 발견: {len(target_root['noticeList'])}개")
+                all_raw_posts.extend(target_root['noticeList'])
+            
+            # (2) 일반 공지 (하단)
+            if 'list' in target_root and isinstance(target_root['list'], list):
+                print(f"📄 일반 공지(list) 발견: {len(target_root['list'])}개")
+                all_raw_posts.extend(target_root['list'])
+            
+            # (3) 만약 둘 다 없으면 그냥 전체 값을 뒤져서 리스트 찾기 (비상용)
+            if not all_raw_posts:
+                for val in target_root.values():
+                    if isinstance(val, list):
+                        all_raw_posts.extend(val)
+
+        print(f"🔍 확보한 게시글: {len(all_raw_posts)}개")
+
+        # 3. 데이터 정제 (순서 유지하며 추출)
         current_posts = []
-        for post in found_raw_posts:
-            title = post['subject']
-            date = post['regdate']
-            seq = post['seq']
+        for post in all_raw_posts:
+            if not isinstance(post, dict): continue
+
+            title = post.get('subject') or post.get('SUBJECT') or post.get('nttSj') or post.get('title')
+            if not title: continue 
+
+            date = post.get('regdate') or post.get('REGDATE') or post.get('date') or '날짜 미상'
+            seq = post.get('seq') or post.get('SEQ') or post.get('id')
             
             if not seq: continue
 
@@ -114,18 +128,15 @@ def run():
                 "link": VIEW_URL
             })
 
-        # [중복 제거] noticeList와 list에 같은 글이 있을 수 있으므로 ID 기준 제거
-        unique_posts_dict = {p['id']: p for p in current_posts}
-        unique_posts = list(unique_posts_dict.values())
-
-        # [정렬] ID 기준 내림차순 (8340 > 8335)
-        # 최신 글(번호가 큰 글)이 리스트 앞쪽에 오도록 정렬
-        unique_posts.sort(key=lambda x: int(x['id']), reverse=True)
+        # [수정 3] 중복 제거 (순서 유지! - Python 3.7+ 딕셔너리는 입력 순서 보장)
+        # 고정 공지와 일반 공지에 같은 글이 있을 경우, 먼저 나온(고정 공지 위치) 녀석을 살림
+        unique_posts = list({p['id']: p for p in current_posts}.values())
+        
+        # [수정 4] 강제 정렬 코드 삭제
+        # unique_posts.sort(...) <- 이 줄을 지워서 서버가 준 순서(사이트 순서)를 그대로 유지함
 
         if unique_posts:
-            print(f"🧹 정제 후 게시글: {len(unique_posts)}개 (최신 ID: {unique_posts[0]['id']})")
-        else:
-            print("⚠️ 정제 후 게시글이 0개입니다. 구조가 완전히 다를 수 있습니다.")
+            print(f"📝 파일 저장 순서: 상단 {unique_posts[0]['id']} ... 하단 {unique_posts[-1]['id']}")
 
         old_posts = []
         if os.path.exists("dorm_data.txt"):
@@ -134,6 +145,7 @@ def run():
 
         save_data = []
         
+        # 순서대로 저장하면서, 알림은 '새로운 것'만 보냄
         for post in unique_posts:
             save_data.append(post["id"])
             if not old_posts: continue
@@ -149,7 +161,7 @@ def run():
             for pid in save_data:
                 f.write(pid + "\n")
         
-        print("💾 dorm_data.txt 업데이트 완료")
+        print("💾 dorm_data.txt 업데이트 완료 (사이트 순서 적용)")
 
     except Exception as e:
         print(f"❌ 오류 발생: {e}")
