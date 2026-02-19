@@ -57,9 +57,9 @@ def run():
         L = instaloader.Instaloader()
         
         # [주의] 비공개 계정이거나 Rate Limit(차단)에 자주 걸리면 아래 주석을 풀고 로그인하세요.
-        # IG_USER = os.environ.get('IG_USER')
-        # IG_PASS = os.environ.get('IG_PASS')
-        # L.login(IG_USER, IG_PASS)
+        IG_USER = os.environ.get('IG_USER')
+        IG_PASS = os.environ.get('IG_PASS')
+        L.login(IG_USER, IG_PASS)
 
         # 프로필 가져오기
         profile = instaloader.Profile.from_username(L.context, TARGET_IG_USERNAME)
