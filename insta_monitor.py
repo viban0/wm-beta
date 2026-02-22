@@ -39,31 +39,40 @@ def send_telegram(title, link, date):
             print(f"텔레그램 전송 실패: {e}")
 
 def run():
-    print(f"🔍 {TARGET_ACCOUNT} 모니터링 중...")
+    print(f"🔍 Picuki를 통해 {TARGET_ACCOUNT} 모니터링 중...")
+    # 인스타그램을 미러링해서 보여주는 사이트입니다.
+    url = f"https://www.picuki.com/profile/{TARGET_ACCOUNT}"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
+    
     try:
-        # RSS 피드 요청 (User-Agent는 예의상 넣어줍니다)
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(RSS_URL, headers=headers, timeout=30)
+        response = requests.get(url, headers=headers, timeout=20)
+        soup = BeautifulSoup(response.content, "html.parser")
         
-        # XML 파싱 (lxml 설치 필요)
-        soup = BeautifulSoup(response.content, "xml")
-        items = soup.find_all("item")[:5] # 최신 5개만 확인
+        # Picuki의 게시물 리스트 아이템 찾기
+        items = soup.select(".post-box")[:5]
         
-        if not items:
-            print("⚠️ 게시물을 찾을 수 없습니다. RSS 주소를 확인해주세요.")
-            return
-
         current_posts = []
         for item in items:
-            title = item.find("title").get_text() if item.find("title") else "내용 없음"
-            link = item.find("link").get_text()
-            pub_date = item.find("pubDate").get_text()
+            # 이미지와 링크 추출
+            img_tag = item.select_one(".post-image")
+            image_url = img_tag.get("src") if img_tag else ""
             
+            link_tag = item.select_one(".photo > a")
+            link = "https://www.picuki.com" + link_tag.get("href") if link_tag else ""
+            
+            # 본문 추출
+            desc_tag = item.select_one(".post-description")
+            description = desc_tag.get_text().strip() if desc_tag else "내용 없음"
+            
+            # 고유 ID 생성 (링크 마지막 부분의 고유 코드 사용)
+            post_id = link.split("/")[-1]
+
             current_posts.append({
-                "id": link, # 인스타 게시물 고유 링크를 ID로 사용
-                "title": title,
+                "id": post_id,
+                "title": description,
                 "link": link,
-                "date": pub_date
+                "image": image_url,
+                "date": "최근 게시물"
             })
 
         # --- 데이터 비교 로직 ---
