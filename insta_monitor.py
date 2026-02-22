@@ -11,7 +11,7 @@ CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 # 광운대 총학 인스타그램 RSS 주소 (RSS-Bridge 공용 인스턴스 활용)
 # 만약 아래 URL이 작동하지 않으면 다른 RSS-Bridge 인스턴스로 교체하면 됩니다.
 TARGET_ACCOUNT = "kwu_studentcouncil"
-RSS_URL = f"https://rssbridge.org/?action=display&bridge=InstagramBridge&context=Username&u={TARGET_ACCOUNT}&format=Mrss"
+RSS_URL = f"https://rss-bridge.org/?action=display&bridge=InstagramBridge&context=Username&u={TARGET_ACCOUNT}&format=Mrss"
 
 def send_telegram(title, link, date):
     if TOKEN and CHAT_ID:
