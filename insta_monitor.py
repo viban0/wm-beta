@@ -1,129 +1,96 @@
 import os
 import requests
-import json
-import instaloader # [NEW] 인스타그램 크롤링을 위한 마법의 라이브러리
+from bs4 import BeautifulSoup
 import html
-import re
+import json
 
-# ▼ 설정 ▼
-TARGET_ACCOUNT = "kwu_studentcouncil"
+# ▼ 설정 (GitHub Secrets에서 가져옴) ▼
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
-def get_emoji(title):
-    # 인스타는 해시태그나 본문 내용에 따라 이모지를 결정하면 좋습니다
-    if "장학" in title or "대출" in title: return "💰" 
-    elif "축제" in title or "비마랑" in title: return "🎉" 
-    elif "간식" in title or "행사" in title: return "🍕" 
-    else: return "📢" 
+# 광운대 총학 인스타그램 RSS 주소 (RSS-Bridge 공용 인스턴스 활용)
+# 만약 아래 URL이 작동하지 않으면 다른 RSS-Bridge 인스턴스로 교체하면 됩니다.
+TARGET_ACCOUNT = "kwu_studentcouncil"
+RSS_URL = f"https://rssbridge.org/?action=display&bridge=InstagramBridge&context=Username&u={TARGET_ACCOUNT}&format=Mrss"
 
-def send_telegram(title, link, info):
+def send_telegram(title, link, date):
     if TOKEN and CHAT_ID:
         try:
-            icon = get_emoji(title)
-            safe_title = html.escape(title)
+            # HTML 특수문자 처리 및 제목 정리
+            # RSS 피드 특성상 제목에 HTML 태그가 섞일 수 있어 제거해줍니다.
+            clean_title = BeautifulSoup(title, "html.parser").get_text()
+            safe_title = html.escape(clean_title[:100]) + "..." if len(clean_title) > 100 else html.escape(clean_title)
 
-            # 인스타그램은 이미지가 메인이므로 본문(title)을 적당히 잘라서 보여줍니다.
-            msg = f"{icon} <b>[총학생회 새글]</b>\n\n" \
-                  f"<i>{safe_title}</i>\n\n" \
-                  f"📅 {info}"
+            msg = f"🔔 <b>[총학생회 인스타 새글]</b>\n\n" \
+                  f"{safe_title}\n\n" \
+                  f"📅 작성일: {date}"
             
             url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-            
-            keyboard = {
-                "inline_keyboard": [
-                    [
-                        {"text": "👉 인스타로 보러가기", "url": link}
-                    ]
-                ]
-            }
+            keyboard = {"inline_keyboard": [[{"text": "👉 게시물 보기", "url": link}]]}
 
             payload = {
                 "chat_id": CHAT_ID,
                 "text": msg,
                 "parse_mode": "HTML",
-                "reply_markup": json.dumps(keyboard),
-                "disable_notification": True 
+                "reply_markup": json.dumps(keyboard)
             }
             requests.post(url, data=payload)
         except Exception as e:
             print(f"텔레그램 전송 실패: {e}")
 
 def run():
-    print(f"🔍 [{TARGET_ACCOUNT}] 인스타그램 스캔 시도...")
-    
-    # Instaloader 객체 생성
-    L = instaloader.Instaloader()
-    
-    # [주의] 인스타그램이 익명 접근을 막을 경우 아래 주석을 풀고 "안 쓰는 부계정"으로 로그인해야 할 수 있습니다.
-    # 본계정 사용은 절대 금물입니다! (봇으로 오해받아 정지될 수 있음)
-    # L.login("내_부계정_아이디", "내_부계정_비밀번호")
-
+    print(f"🔍 {TARGET_ACCOUNT} 모니터링 중...")
     try:
-        # 타겟 계정 프로필 가져오기
-        profile = instaloader.Profile.from_username(L.context, TARGET_ACCOUNT)
+        # RSS 피드 요청 (User-Agent는 예의상 넣어줍니다)
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(RSS_URL, headers=headers, timeout=30)
         
-        # 게시물 가져오기 (제네레이터 형태)
-        posts = profile.get_posts()
+        # XML 파싱 (lxml 설치 필요)
+        soup = BeautifulSoup(response.content, "xml")
+        items = soup.find_all("item")[:5] # 최신 5개만 확인
+        
+        if not items:
+            print("⚠️ 게시물을 찾을 수 없습니다. RSS 주소를 확인해주세요.")
+            return
 
-        current_new_posts = []
-        count = 0
-        
-        print("📥 최신 게시물 분석 중...")
-        for post in posts:
-            # 💡 [핵심] 무료를 유지하려면 인스타 서버에 무리를 주면 안 됩니다. 
-            # 딱 최신 3개만 검사하고 빠집니다.
-            if count >= 3: 
-                break
-                
-            # post.shortcode: 게시물 고유 ID (이걸 기준으로 중복 판별)
-            # post.caption: 인스타 본문
-            link = f"https://www.instagram.com/p/{post.shortcode}/"
-            caption = post.caption if post.caption else "내용 없음"
+        current_posts = []
+        for item in items:
+            title = item.find("title").get_text() if item.find("title") else "내용 없음"
+            link = item.find("link").get_text()
+            pub_date = item.find("pubDate").get_text()
             
-            # 인스타는 제목이 없으니 본문 앞부분을 제목처럼 사용
-            title_preview = caption[:100] + "..." if len(caption) > 100 else caption
-            fingerprint = post.shortcode
-
-            current_new_posts.append({
-                "id": fingerprint,
-                "title": title_preview,
+            current_posts.append({
+                "id": link, # 인스타 게시물 고유 링크를 ID로 사용
+                "title": title,
                 "link": link,
-                "info": f"{post.date_utc.strftime('%Y-%m-%d %H:%M:%S')} (UTC)"
+                "date": pub_date
             })
-            count += 1
 
-        # --- 이 아래는 바이브코더님의 원본 로직과 100% 동일합니다! ---
-        # 파일 이름을 insta_data.txt로 바꿔서 기존 학교 공지 봇과 충돌하지 않게 합니다.
+        # --- 데이터 비교 로직 ---
+        DB_FILE = "insta_data.txt"
         old_posts = []
-        if os.path.exists("insta_data.txt"):
-            with open("insta_data.txt", "r", encoding="utf-8") as f:
+        if os.path.exists(DB_FILE):
+            with open(DB_FILE, "r", encoding="utf-8") as f:
                 old_posts = [line.strip() for line in f.readlines() if line.strip()]
 
         save_data = []
-        for post in current_new_posts:
+        for post in current_posts:
             save_data.append(post["id"])
             
-            if not old_posts:
-                continue
-            
-            if post["id"] not in old_posts:
-                print(f"🚀 새 인스타 알림 전송: {post['link']}")
-                send_telegram(post['title'], post['link'], post['info'])
+            # 첫 실행이 아니고, 기존 DB에 없는 링크라면 전송
+            if old_posts and post["id"] not in old_posts:
+                print(f"🚀 새 게시물 발견! 전송 중: {post['link']}")
+                send_telegram(post['title'], post['link'], post['date'])
 
-        if not old_posts:
-             print("🚀 첫 실행: 기준점 잡기 완료")
-
-        with open("insta_data.txt", "w", encoding="utf-8") as f:
+        # 결과 저장
+        with open(DB_FILE, "w", encoding="utf-8") as f:
             for pid in save_data:
                 f.write(pid + "\n")
         
-        print("💾 insta_data.txt 업데이트 완료")
+        print("💾 체크 완료 및 데이터 업데이트.")
 
     except Exception as e:
         print(f"❌ 오류 발생: {e}")
-        print("💡 힌트: 인스타그램에서 봇을 차단했을 수 있습니다. IP를 바꾸거나 부계정 로그인이 필요할 수 있습니다.")
-        exit(1)
 
 if __name__ == "__main__":
     run()
