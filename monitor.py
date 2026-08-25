@@ -1,10 +1,8 @@
 import os
 import requests
-import json
+import json # [NEW] 버튼 기능을 위해 추가
 from bs4 import BeautifulSoup
 import urllib3
-import re
-import html # [NEW] HTML 특수문자 처리를 위해 추가
 
 # SSL 인증서 경고 무시
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -14,6 +12,9 @@ TARGET_URL = "https://www.kw.ac.kr/ko/life/notice.jsp"
 TOKEN = os.environ.get('TELEGRAM_TOKEN')
 CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 
+# ------------------------------------------------------
+# 1. 키워드별 이모지 매핑
+# ------------------------------------------------------
 def get_emoji(title):
     if "장학" in title or "대출" in title: return "💰" 
     elif "학사" in title or "수업" in title or "복학" in title: return "📅" 
@@ -24,26 +25,24 @@ def get_emoji(title):
     elif "대회" in title or "공모" in title: return "🏆" 
     else: return "📢" 
 
+# ------------------------------------------------------
+# 2. 텔레그램 전송 함수 (버튼 추가)
+# ------------------------------------------------------
 def send_telegram(title, link, info):
     if TOKEN and CHAT_ID:
         try:
             icon = get_emoji(title)
+            # 대괄호가 마크다운 링크 문법이랑 겹쳐서 깨지는 걸 방지
+            safe_title = title
             
-            # 1. [머리말] 뒤에 줄바꿈 추가 (Regex)
-            # 예: "[외부] 제목" -> "[외부]\n제목"
-            temp_title = re.sub(r'(?<=\])\s*', '\n', title).strip()
-            
-            # 2. [NEW] HTML 이스케이프 처리
-            # 제목에 <, >, & 같은 문자가 있으면 HTML 태그로 오해해서 에러가 날 수 있으므로 변환합니다.
-            safe_title = html.escape(temp_title)
-
-            # 3. [NEW] HTML 태그로 볼드체(굵게) 적용 (<b>...</b>)
-            msg = f"{icon} <b>{safe_title}</b>\n" \
+            # [수정] 텍스트 링크([👉 공지 바로가기]...)를 제거하고 본문만 남김
+            msg = f"{icon} *{safe_title}*\n" \
                   f"\n" \
                   f"{info}"
             
             url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
             
+            # [NEW] 버튼 생성
             keyboard = {
                 "inline_keyboard": [
                     [
@@ -55,9 +54,8 @@ def send_telegram(title, link, info):
             payload = {
                 "chat_id": CHAT_ID,
                 "text": msg,
-                "parse_mode": "HTML", # [핵심] Markdown 대신 HTML 모드 사용!
-                "reply_markup": json.dumps(keyboard),
-                "disable_notification": True 
+                "parse_mode": "Markdown",
+                "reply_markup": json.dumps(keyboard) # 버튼 데이터 추가
             }
             requests.post(url, data=payload)
         except Exception as e:
@@ -85,13 +83,22 @@ def run():
             a_tag = item.select_one("div.board-text > a")
             info_tag = item.select_one("p.info") 
 
-            if info_tag and "교수지원팀" in info_tag.get_text():
-                continue
+            # 1. 작성부서(info_tag) 필터링
+            if info_tag:
+                info_text = info_tag.get_text()
+                if "교수지원팀" in info_text or "국제학생" in info_text:
+                    continue
 
+            # 2. 제목(a_tag) 필터링 - 채용 공고 관련 키워드 제외
             if a_tag:
                 raw_title = " ".join(a_tag.get_text().split())
                 clean_title = raw_title.replace("신규게시글", "").replace("Attachment", "").strip()
                 
+                # 채용 관련 키워드가 제목에 포함되어 있으면 스킵
+                exclude_keywords = ["채용", "초빙", "구인", "강사채용", "교원채용"]
+                if any(keyword in clean_title for keyword in exclude_keywords):
+                    continue
+
                 link = a_tag.get('href')
                 full_link = f"https://www.kw.ac.kr{link}" if link else TARGET_URL
                 
