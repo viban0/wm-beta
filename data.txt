@@ -1,14 +1,18 @@
-[외부] 2026년 서울시립일시청소년쉼터 자원활동가 모집|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51886&tpage=1&searchKey=1&searchVal=&srCategoryId=
-[국제학생] 2026학년도 1학기 외국인 학부생 대상 『한국어 교과목』 반배정(지정과목) 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51846&tpage=1&searchKey=1&searchVal=&srCategoryId=
-[국제학생] [아모레퍼시픽] 2026 글로벌 신입 채용(외국인) 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51883&tpage=1&searchKey=1&searchVal=&srCategoryId=
-[학사] 2026학년도 편입생 학사 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51869&tpage=1&searchKey=1&searchVal=&srCategoryId=
-[봉사] ★ 광운대학교 사회봉사단 학생봉사대 17기 신입단원 모집 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51868&tpage=1&searchKey=1&searchVal=&srCategoryId=
-[일반] 기간제 계약직원 채용(대학원 AI미디어솔루션학과)|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51862&tpage=1&searchKey=1&searchVal=&srCategoryId=
-[학사] 2026학년도 1학기 학생증 발급 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51861&tpage=1&searchKey=1&searchVal=&srCategoryId=
-[학사] 2026학년도 1학기 강의시간 및 기타 변경사항 안내 (20260219 수정)|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51745&tpage=1&searchKey=1&searchVal=&srCategoryId=
-[학사] 2026학년도 １학기 수강신청자료집 (20260202 게시)|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51714&tpage=1&searchKey=1&searchVal=&srCategoryId=
-[국제교류] 샌디에고주립대(SDSU) 파견 교환학생 설명회 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51852&tpage=1&searchKey=1&searchVal=&srCategoryId=
-[학사] 2026학년도 신입생 학사 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51851&tpage=1&searchKey=1&searchVal=&srCategoryId=
-[일반] 2026년도 1학기 공인회계사반 정기 모집 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51847&tpage=1&searchKey=1&searchVal=&srCategoryId=
-[일반] [교수학습센터] 2025-2학기 학사경고자 대상 광운앤아이 학습설계 프로그램 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51845&tpage=1&searchKey=1&searchVal=&srCategoryId=
-[학생] 2026학년도 1학기 학부, 대학원 연계과목(학석사연계과정) 수강신청 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=51773&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[학생] 장소사용 신청 안내(2026년 9월)|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53188&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[등록/장학] 2026학년도 2학기 국가근로장학금(사업) 장학생 선발 확정 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53187&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[등록/장학] 2026년도 제23회 안중근 의사 장학생 후보 모집 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53184&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[학생] 2026년 광운대 학군사관후보생 67·68기 선발 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53183&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[일반] [NCI창업패키지사업단] 모두의 창업 프로젝트 2기 찾아가는 설명회 통합 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53070&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[일반] 2026 BTS(Blueprint To Success)의 성공 노트(명사 초청 특강) : 마인드 마이너 송길영 작가/모두의 창업 설명회|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=52926&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[국제학생] FC서울 외국인 팬의날 행사 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53182&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[국제학생] 2026학년도 2학기 외국인 유학생 수강신청 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53009&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[일반] 제2회 도봉 창업 포럼 (NCI 민.관.학 창업 포럼) : 기조강연 과학크리에이터 궤도 - 딥테크와 창업이 바꾼 세상 / 사전등록(~9.14)|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53143&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[일반] [강북청년창업마루] 스타트업 투자 전략 및 사레 기반 모의 투자 실습 교육생 모집|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53180&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[등록/장학] (재)달서인재육성장학재단 2026년도 하반기 장학생 선발 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53175&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[학사] 2026학년도 2학기 학부 재수강 불가 과목의 취득학점 포기 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53174&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[학사] 2026학년도 2학기 CDP특강 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53171&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[일반] [교수학습센터]2026-2 찾아가는 전문가 특강 참여 교원 모집|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53166&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[일반] [교수학습센터] 2026-2학기 1:1 학습코칭 다회기 참여학생 모집(선착순 20명)|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53165&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[국제교류] 2027학년도 일본대학 파견 교환학생 면접전형 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53163&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[학사] 2026학년도 2학기 서울권역e-러닝 학사일정 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53157&tpage=1&searchKey=1&searchVal=&srCategoryId=
+[학사] 2026학년도 2학기 1:1 영어클리닉 프로그램 안내|https://www.kw.ac.kr/ko/life/notice.jsp?BoardMode=view&DUID=53154&tpage=1&searchKey=1&searchVal=&srCategoryId=
