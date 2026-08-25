@@ -95,7 +95,7 @@ def run():
                 clean_title = raw_title.replace("신규게시글", "").replace("Attachment", "").strip()
                 
                 # 채용 관련 키워드가 제목에 포함되어 있으면 스킵
-                exclude_keywords = ["채용", "초빙", "구인", "강사채용", "교원채용"]
+                exclude_keywords = ["채용"]
                 if any(keyword in clean_title for keyword in exclude_keywords):
                     continue
 
