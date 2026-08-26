@@ -2,6 +2,7 @@ name: 학사일정 아침 브리핑
 
 on:
   
+    
   workflow_dispatch:       # 수동 실행 버튼
 
 jobs:
