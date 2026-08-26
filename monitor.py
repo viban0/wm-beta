@@ -83,21 +83,17 @@ def run():
             a_tag = item.select_one("div.board-text > a")
             info_tag = item.select_one("p.info") 
 
-            # 1. 작성부서(info_tag) 필터링
-            if info_tag:
-                info_text = info_tag.get_text()
-                if "교수지원팀" in info_text or "국제학생" in info_text:
-                    continue
+            # 교수지원팀 필터링
+            if info_tag and "교수지원팀" in info_tag.get_text():
+                continue
 
-            # 2. 제목(a_tag) 필터링 - 채용 공고 관련 키워드 제외
+           
+            if info_tag and "국제학생" in info_tag.get_text():
+                continue 
+
             if a_tag:
                 raw_title = " ".join(a_tag.get_text().split())
                 clean_title = raw_title.replace("신규게시글", "").replace("Attachment", "").strip()
-                
-                # 채용 관련 키워드가 제목에 포함되어 있으면 스킵
-                exclude_keywords = ["채용"]
-                if any(keyword in clean_title for keyword in exclude_keywords):
-                    continue
 
                 link = a_tag.get('href')
                 full_link = f"https://www.kw.ac.kr{link}" if link else TARGET_URL
