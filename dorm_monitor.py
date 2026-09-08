@@ -30,7 +30,7 @@ def send_telegram(title, date, link):
                 "text": msg,
                 "parse_mode": "HTML", 
                 "reply_markup": json.dumps(keyboard),
-                "disable_notification": True 
+                
             }
             requests.post(url, data=payload)
         except Exception as e:
