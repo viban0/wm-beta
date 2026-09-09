@@ -24,53 +24,16 @@ def get_emoji(title: str) -> str:
             return emoji
     return "📢"
 
-def notify_post(session: requests.Session, title: str, link: str, info: str) -> bool:
+def notify_post(session: requests.Session, title: str, link: str) -> bool:
     """텔레그램 봇으로 알림 메시지 및 인라인 버튼을 전송합니다."""
     icon = get_emoji(title)
     safe_title = html.escape(title)
-    safe_info = html.escape(info)
-    detail = f"\n<blockquote>{safe_info.lstrip('| ').strip()}</blockquote>" if safe_info else ""
-    message = f"{icon} <b>새 광운대 공지</b>\n\n{safe_title}{detail}"
+    # The notification itself already conveys "new"; keep the title as the
+    # first thing students see and avoid duplicating low-value metadata.
+    message = f"{icon} <b>{safe_title}</b>"
     return send_telegram(session, message, {
         "inline_keyboard": [[{"text": "공지 자세히 보기 →", "url": link}]]
     })
-
-def parse_meta_info(info_tag) -> str:
-    """게시글 태그에서 작성일 등 필요 메타 정보만 정제하여 반환합니다."""
-    if not info_tag:
-        return ""
-        
-    raw_text = info_tag.get_text("|", strip=True)
-    parts = raw_text.split("|")
-    clean_parts = []
-    skip_next = False
-
-    for part in parts:
-        p = part.strip()
-        if not p:
-            continue
-        if "수정일" in p:
-            skip_next = True
-            continue
-        if skip_next:
-            skip_next = not any(char.isdigit() for char in p)
-            continue
-        if "조회" in p:
-            continue
-        clean_parts.append(p)
-
-    final_parts = []
-    idx = 0
-    while idx < len(clean_parts):
-        current = clean_parts[idx]
-        if "작성일" in current and idx + 1 < len(clean_parts):
-            final_parts.append(f"{current} {clean_parts[idx+1]}")
-            idx += 2
-        else:
-            final_parts.append(current)
-            idx += 1
-
-    return "| " + " | ".join(final_parts) if final_parts else ""
 
 def run() -> None:
     session = create_session()
@@ -110,14 +73,12 @@ def run() -> None:
                 link = a_tag.get('href')
                 full_link = f"https://www.kw.ac.kr{link}" if link else TARGET_URL
                 
-                meta_info = parse_meta_info(info_tag)
                 fingerprint = f"{clean_title}|{full_link}"
 
                 current_new_posts.append({
                     "id": fingerprint,
                     "title": clean_title,
                     "link": full_link,
-                    "info": meta_info
                 })
 
         # 이전 데이터 읽기 (Set을 활용하여 조회 속도 단축)
@@ -135,7 +96,7 @@ def run() -> None:
 
             if post["id"] not in old_posts:
                 print(f"🚀 새 공지: {post['title']}")
-                if notify_post(session, post['title'], post['link'], post['info']):
+                if notify_post(session, post['title'], post['link']):
                     save_data.append(post["id"])
 
         if is_first_run:

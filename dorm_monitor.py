@@ -6,8 +6,10 @@ from bot_utils import create_session, read_state, send_telegram, write_state
 API_URL = "https://kw.happydorm.or.kr/bbs/getBbsList.do"
 VIEW_URL = "https://kw.happydorm.or.kr/60/6010.do"
 
-def notify_post(session, title, date, link):
-    message = f"🏠 <b>새 행복기숙사 공지</b>\n\n{html.escape(title)}\n<blockquote>작성일 {html.escape(str(date))}</blockquote>"
+def notify_post(session, title, link):
+    # The push notification is sufficient context; do not repeat "new" or add
+    # a copyable date that does not help a student decide whether to open it.
+    message = f"🏠 <b>{html.escape(title)}</b>"
     return send_telegram(session, message, {
         "inline_keyboard": [[{"text": "기숙사 공지 보기 →", "url": link}]]
     }, disable_notification=True)
@@ -111,7 +113,7 @@ def run():
             
             if post["id"] not in old_posts:
                 print(f"🚀 새 기숙사 공지: {post['title']} (ID: {post['id']})")
-                if notify_post(session, post['title'], post['date'], post['link']):
+                if notify_post(session, post['title'], post['link']):
                     save_data.append(post["id"])
 
         if not old_posts:
