@@ -1,4 +1,5 @@
 import html
+import re
 from typing import Set
 import requests
 from bs4 import BeautifulSoup
@@ -24,16 +25,27 @@ def get_emoji(title: str) -> str:
             return emoji
     return "📢"
 
-def notify_post(session: requests.Session, title: str, link: str) -> bool:
+def notify_post(session: requests.Session, title: str, link: str, modified_at: str) -> bool:
     """텔레그램 봇으로 알림 메시지 및 인라인 버튼을 전송합니다."""
     icon = get_emoji(title)
     safe_title = html.escape(title)
     # The notification itself already conveys "new"; keep the title as the
     # first thing students see and avoid duplicating low-value metadata.
-    message = f"{icon} <b>{safe_title}</b>"
+    modified_line = f"\n수정일 · {html.escape(modified_at)}" if modified_at else ""
+    message = f"{icon} <b>{safe_title}</b>{modified_line}"
     return send_telegram(session, message, {
         "inline_keyboard": [[{"text": "공지 자세히 보기 →", "url": link}]]
     })
+
+
+def get_modified_date(info_tag) -> str:
+    """Extract only the updated date from the board metadata, when available."""
+    if not info_tag:
+        return ""
+
+    text = " ".join(info_tag.stripped_strings)
+    match = re.search(r"수정일\s*[:：]?\s*([^|]+?)(?=\s*(?:\||작성일|조회)|$)", text)
+    return match.group(1).strip() if match else ""
 
 def run() -> None:
     session = create_session()
@@ -79,6 +91,7 @@ def run() -> None:
                     "id": fingerprint,
                     "title": clean_title,
                     "link": full_link,
+                    "modified_at": get_modified_date(info_tag),
                 })
 
         # 이전 데이터 읽기 (Set을 활용하여 조회 속도 단축)
@@ -96,7 +109,7 @@ def run() -> None:
 
             if post["id"] not in old_posts:
                 print(f"🚀 새 공지: {post['title']}")
-                if notify_post(session, post['title'], post['link']):
+                if notify_post(session, post['title'], post['link'], post['modified_at']):
                     save_data.append(post["id"])
 
         if is_first_run:

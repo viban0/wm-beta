@@ -189,7 +189,7 @@ def run():
         menu_msg = get_cafeteria_menu(session)
         
         # [수정] 제목 변경 (광운대 삭제), 날씨 삭제
-        final_msg = f"☀️ <b>광운대 데일리 브리핑</b>\n{today_str}\n\n" \
+        final_msg = f"☀️ {today_str}\n\n" \
                     f"{calendar_msg}\n\n" \
                     f"━━━━━━━━━━━━━━━━\n" \
                     f"🥄 <b>오늘의 학식</b>\n\n" \
