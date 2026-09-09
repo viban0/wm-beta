@@ -1,40 +1,16 @@
-import os
-import requests
-import json
-import urllib3
 import html
-
-# SSL 인증서 경고 무시
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import requests
+from bot_utils import create_session, read_state, send_telegram, write_state
 
 # ▼ 설정 ▼
 API_URL = "https://kw.happydorm.or.kr/bbs/getBbsList.do"
 VIEW_URL = "https://kw.happydorm.or.kr/60/6010.do"
 
-TOKEN = os.environ.get('TELEGRAM_TOKEN')
-CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
-
-def send_telegram(title, date, link):
-    if TOKEN and CHAT_ID:
-        try:
-            safe_title = html.escape(title)
-            msg = f"🏠 <b>[행복기숙사] {safe_title}</b>\n\n" \
-                  f"| 작성일 {date}"
-            
-            url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-            keyboard = {
-                "inline_keyboard": [[{"text": "👉 기숙사 공지 보러가기", "url": link}]]
-            }
-            payload = {
-                "chat_id": CHAT_ID,
-                "text": msg,
-                "parse_mode": "HTML", 
-                "reply_markup": json.dumps(keyboard),
-                
-            }
-            requests.post(url, data=payload)
-        except Exception as e:
-            print(f"텔레그램 전송 실패: {e}")
+def notify_post(session, title, date, link):
+    message = f"🏠 <b>새 행복기숙사 공지</b>\n\n{html.escape(title)}\n<blockquote>작성일 {html.escape(str(date))}</blockquote>"
+    return send_telegram(session, message, {
+        "inline_keyboard": [[{"text": "기숙사 공지 보기 →", "url": link}]]
+    }, disable_notification=True)
 
 # [핵심 기능] 성공했던 "재귀 탐색" 함수 복구!
 # 키 이름(noticeList 등)을 몰라도, 내용물(seq, subject)이 있으면 무조건 찾아냅니다.
@@ -82,7 +58,10 @@ def run():
     }
 
     try:
-        res = requests.post(API_URL, data=data, headers=headers, verify=False, timeout=10)
+        session = create_session()
+        session.headers.update(headers)
+        res = session.post(API_URL, data=data, timeout=10)
+        res.raise_for_status()
         
         try:
             result = res.json()
@@ -120,28 +99,25 @@ def run():
         if final_posts:
             print(f"📝 저장 범위: 상단 {final_posts[0]['id']} ... 하단 {final_posts[-1]['id']} (총 {len(final_posts)}개)")
         
-        old_posts = []
-        if os.path.exists("dorm_data.txt"):
-            with open("dorm_data.txt", "r", encoding="utf-8") as f:
-                old_posts = [line.strip() for line in f.readlines() if line.strip()]
+        old_posts = read_state("dorm_data.txt")
 
-        save_data = []
+        save_data = list(old_posts)
         
         # 알림 전송 및 저장
         for post in final_posts:
-            save_data.append(post["id"])
-            if not old_posts: continue
+            if not old_posts:
+                save_data.append(post["id"])
+                continue
             
             if post["id"] not in old_posts:
                 print(f"🚀 새 기숙사 공지: {post['title']} (ID: {post['id']})")
-                send_telegram(post['title'], post['date'], post['link'])
+                if notify_post(session, post['title'], post['date'], post['link']):
+                    save_data.append(post["id"])
 
         if not old_posts:
              print("🚀 첫 실행: 기준점 잡기 완료")
 
-        with open("dorm_data.txt", "w", encoding="utf-8") as f:
-            for pid in save_data:
-                f.write(pid + "\n")
+        write_state("dorm_data.txt", save_data[-100:])
         
         print("💾 dorm_data.txt 업데이트 완료")
 

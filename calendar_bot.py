@@ -1,10 +1,10 @@
-import os
-import requests
-import json
+import html
 from bs4 import BeautifulSoup
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 import re
 import traceback
+from zoneinfo import ZoneInfo
+from bot_utils import create_session, send_telegram
 
 # ▼ 설정 ▼
 CALENDAR_API_URL = "https://www.kw.ac.kr/KWBoard/list5_detail.jsp"
@@ -13,30 +13,9 @@ MENU_URL = "https://www.kw.ac.kr/ko/life/facility11.jsp"
 NOTICE_URL = "https://www.kw.ac.kr/ko/life/notice.jsp"
 FEEDBACK_GROUP_URL = "https://t.me/+p-QVo1Z6e5AxNTdl"
 
-TOKEN = os.environ.get('TELEGRAM_TOKEN')
-CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
-
-def send_telegram(message, buttons=None):
-    if TOKEN and CHAT_ID:
-        try:
-            url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-            payload = {
-                "chat_id": CHAT_ID,
-                "text": message,
-                "parse_mode": "Markdown",
-                "disable_web_page_preview": True
-            }
-            if buttons:
-                payload['reply_markup'] = json.dumps(buttons)
-            requests.post(url, data=payload)
-        except Exception as e:
-            print(f"텔레그램 전송 실패: {e}")
-
 def get_korea_today():
-    """서버 시간(UTC)에 9시간을 더해 한국 날짜를 반환"""
-    utc_now = datetime.utcnow()
-    kst_now = utc_now + timedelta(hours=9)
-    return kst_now.date()
+    """Return the current calendar date in Korea, independent of runner locale."""
+    return datetime.now(ZoneInfo("Asia/Seoul")).date()
 
 def get_day_kor(date_obj):
     """ 날짜 객체를 받아서 한국어 요일(월~일) 반환 """
@@ -46,11 +25,11 @@ def get_day_kor(date_obj):
 # -----------------------------------------------------------
 # [기능 1] 학식 (Requests)
 # -----------------------------------------------------------
-def get_cafeteria_menu():
+def get_cafeteria_menu(session):
     try:
         # print(f"🍚 학식 정보 요청: {MENU_URL}") # 로그 줄임
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(MENU_URL, headers=headers, verify=False, timeout=10)
+        res = session.get(MENU_URL, timeout=10)
+        res.raise_for_status()
         soup = BeautifulSoup(res.text, 'html.parser')
         
         today_str = get_korea_today().strftime("%Y-%m-%d")
@@ -81,7 +60,7 @@ def get_cafeteria_menu():
             menu_content = cols[target_idx].get_text("\n", strip=True)
             
             if menu_content:
-                menu_list.append(f"🍱 *{category}*\n{menu_content}")
+                menu_list.append(f"<b>{html.escape(category)}</b>\n{html.escape(menu_content)}")
 
         return "\n\n".join(menu_list) if menu_list else "🍙 등록된 식단 내용이 없습니다."
 
@@ -91,15 +70,16 @@ def get_cafeteria_menu():
 # -----------------------------------------------------------
 # [기능 2] 학사일정 (API Reverse Engineering)
 # -----------------------------------------------------------
-def fetch_calendar_data(year, month):
+def fetch_calendar_data(session, year, month):
     try:
         data = {'sy': str(year), 'sm': str(month)}
-        res = requests.post(CALENDAR_API_URL, data=data, verify=False, timeout=10)
+        res = session.post(CALENDAR_API_URL, data=data, timeout=10)
+        res.raise_for_status()
         return res.text 
     except:
         return ""
 
-def get_academic_calendar():
+def get_academic_calendar(session):
     today = get_korea_today()
     
     target_months = [
@@ -110,7 +90,7 @@ def get_academic_calendar():
 
     all_list_items = []
     for y, m in target_months:
-        html_fragment = fetch_calendar_data(y, m)
+        html_fragment = fetch_calendar_data(session, y, m)
         if html_fragment:
             soup = BeautifulSoup(html_fragment, 'html.parser')
             items = soup.find_all("li")
@@ -159,9 +139,9 @@ def get_academic_calendar():
             if s_date != e_date:
                 end_str = e_date.strftime("%m.%d")
                 end_day = get_day_kor(e_date)
-                today_events.append(f"• {title} ~ {end_str}({end_day})")
+                today_events.append(f"• {html.escape(title)} ~ {end_str}({end_day})")
             else:
-                today_events.append(f"• {title}")
+                today_events.append(f"• {html.escape(title)}")
         
         # 다가오는 일정
         elif s_date > today:
@@ -176,27 +156,28 @@ def get_academic_calendar():
     events_text = []
     
     if today_events:
-        events_text.append(f"🔔 *오늘의 일정*\n" + "\n".join(today_events))
+        events_text.append("🔔 <b>오늘의 일정</b>\n" + "\n".join(today_events))
     else:
         # [수정] 멘트 변경 (부드럽게)
-        events_text.append(f"🔔 *오늘의 일정*\n 오늘은 예정된 일정이 없어요 🌿")
+        events_text.append("🔔 <b>오늘의 일정</b>\n오늘은 예정된 일정이 없어요 🌿")
     
     if upcoming_events:
         upcoming_events.sort(key=lambda x: x['d_day'])
         min_d_day = upcoming_events[0]['d_day']
         nearest_events = [e for e in upcoming_events if e['d_day'] == min_d_day]
         
-        temp = ["\n⏳ *다가오는 일정*"]
+        temp = ["⏳ <b>다가오는 일정</b>"]
         for e in nearest_events:
             d_day_str = "D-DAY" if e['d_day'] == 0 else f"D-{e['d_day']}"
             # 괄호 제거된 상태 유지
-            temp.append(f"[{d_day_str}] {e['title']} {e['date']}")
+            temp.append(f"<b>{d_day_str}</b>  {html.escape(e['title'])}\n{html.escape(e['date'])}")
         events_text.append("\n".join(temp))
         
     return "\n".join(events_text) if events_text else "• 예정된 주요 학사일정이 없습니다."
 
 def run():
     try:
+        session = create_session()
         today = get_korea_today()
         # [수정] 요일 한국어로 변경
         day_kor = get_day_kor(today)
@@ -204,16 +185,15 @@ def run():
         
         print(f"🚀 모닝 브리핑 실행 ({today_str})")
         
-        calendar_msg = get_academic_calendar()
-        menu_msg = get_cafeteria_menu()
+        calendar_msg = get_academic_calendar(session)
+        menu_msg = get_cafeteria_menu(session)
         
         # [수정] 제목 변경 (광운대 삭제), 날씨 삭제
-        final_msg = f"☀️ {today_str}\n\n" \
+        final_msg = f"☀️ <b>광운대 데일리 브리핑</b>\n{today_str}\n\n" \
                     f"{calendar_msg}\n\n" \
-                    f"────────────────\n" \
-                    f"🥄 *오늘의 학식*\n\n" \
-                    f"{menu_msg}\n" \
-                    f" "
+                    f"━━━━━━━━━━━━━━━━\n" \
+                    f"🥄 <b>오늘의 학식</b>\n\n" \
+                    f"{menu_msg}"
         
         # [수정] 버튼 이름 변경 (피드백)
         keyboard = {
@@ -231,13 +211,16 @@ def run():
 
         # print(final_msg) # 로그 너무 길면 생략 가능
         print("📨 텔레그램 전송 중...")
-        send_telegram(final_msg, buttons=keyboard)
-        print("✅ 전송 완료")
+        if send_telegram(session, final_msg, buttons=keyboard):
+            print("✅ 전송 완료")
+        else:
+            raise RuntimeError("Telegram did not accept the morning briefing")
 
     except Exception as e:
-        error_msg = f"🔥 [비상] 봇 실행 중 오류 발생!\n\n{str(e)}\n\n{traceback.format_exc()}"
+        error_msg = f"🔥 <b>모닝 브리핑 실행 오류</b>\n\n{html.escape(str(e))}"
         print(error_msg)
-        send_telegram(error_msg)
+        send_telegram(create_session(), error_msg)
+        print(traceback.format_exc())
 
 if __name__ == "__main__":
     run()

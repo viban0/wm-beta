@@ -1,19 +1,11 @@
 import html
-import json
-import os
 from typing import Set
 import requests
 from bs4 import BeautifulSoup
-import urllib3
-
-# SSL 경고 비활성화
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from bot_utils import create_session, read_state, send_telegram, write_state
 
 # ▼ 설정 ▼
 TARGET_URL = "https://www.kw.ac.kr/ko/life/notice.jsp"
-TOKEN = os.environ.get('TELEGRAM_TOKEN')
-CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
-
 # 키워드별 이모지 매핑 테이블
 EMOJI_MAP = [
     (("장학", "대출"), "💰"),
@@ -32,36 +24,16 @@ def get_emoji(title: str) -> str:
             return emoji
     return "📢"
 
-def send_telegram(session: requests.Session, title: str, link: str, info: str) -> None:
+def notify_post(session: requests.Session, title: str, link: str, info: str) -> bool:
     """텔레그램 봇으로 알림 메시지 및 인라인 버튼을 전송합니다."""
-    if not (TOKEN and CHAT_ID):
-        return
-
-    try:
-        icon = get_emoji(title)
-        safe_title = html.escape(title)
-        safe_info = html.escape(info)
-        
-        msg = f"{icon} <b>{safe_title}</b>\n\n{safe_info}"
-        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-
-        keyboard = {
-            "inline_keyboard": [
-                [{"text": "👉 공지 내용 보러가기", "url": link}]
-            ]
-        }
-
-        payload = {
-            "chat_id": CHAT_ID,
-            "text": msg,
-            "parse_mode": "HTML",
-            "reply_markup": json.dumps(keyboard)
-        }
-
-        response = session.post(url, data=payload, timeout=10)
-        response.raise_for_status()
-    except Exception as e:
-        print(f"⚠️ 텔레그램 전송 실패: {e}")
+    icon = get_emoji(title)
+    safe_title = html.escape(title)
+    safe_info = html.escape(info)
+    detail = f"\n<blockquote>{safe_info.lstrip('| ').strip()}</blockquote>" if safe_info else ""
+    message = f"{icon} <b>새 광운대 공지</b>\n\n{safe_title}{detail}"
+    return send_telegram(session, message, {
+        "inline_keyboard": [[{"text": "공지 자세히 보기 →", "url": link}]]
+    })
 
 def parse_meta_info(info_tag) -> str:
     """게시글 태그에서 작성일 등 필요 메타 정보만 정제하여 반환합니다."""
@@ -101,14 +73,11 @@ def parse_meta_info(info_tag) -> str:
     return "| " + " | ".join(final_parts) if final_parts else ""
 
 def run() -> None:
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36"
-    })
+    session = create_session()
 
     try:
         print(f"🌐 접속 시도: {TARGET_URL}")
-        response = session.get(TARGET_URL, verify=False, timeout=30)
+        response = session.get(TARGET_URL, timeout=30)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -152,30 +121,28 @@ def run() -> None:
                 })
 
         # 이전 데이터 읽기 (Set을 활용하여 조회 속도 단축)
-        old_posts: Set[str] = set()
-        if os.path.exists("data.txt"):
-            with open("data.txt", "r", encoding="utf-8") as f:
-                old_posts = {line.strip() for line in f if line.strip()}
+        old_posts: Set[str] = read_state("data.txt")
 
         is_first_run = not old_posts
-        save_data = []
+        # Preserve a rolling history. This prevents a temporarily failed delivery
+        # from disappearing when the site removes its "new" label.
+        save_data = list(old_posts)
 
         for post in current_new_posts:
-            save_data.append(post["id"])
-
             if is_first_run:
+                save_data.append(post["id"])
                 continue
 
             if post["id"] not in old_posts:
                 print(f"🚀 새 공지: {post['title']}")
-                send_telegram(session, post['title'], post['link'], post['info'])
+                if notify_post(session, post['title'], post['link'], post['info']):
+                    save_data.append(post["id"])
 
         if is_first_run:
             print("🚀 첫 실행: 기준점 잡기 완료")
 
         # 파일 갱신
-        with open("data.txt", "w", encoding="utf-8") as f:
-            f.write("\n".join(save_data) + ("\n" if save_data else ""))
+        write_state("data.txt", save_data[-250:])
         
         print("💾 data.txt 업데이트 완료")
 
