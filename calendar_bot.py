@@ -170,7 +170,9 @@ def get_academic_calendar(session):
         for e in nearest_events:
             d_day_str = "D-DAY" if e['d_day'] == 0 else f"D-{e['d_day']}"
             # 괄호 제거된 상태 유지
-            temp.append(f"<b>{d_day_str}</b>  {html.escape(e['title'])}\n{html.escape(e['date'])}")
+            temp.append(
+                f"<b>{d_day_str}</b> · {html.escape(e['title'])} · {html.escape(e['date'])}"
+            )
         events_text.append("\n".join(temp))
         
     return "\n".join(events_text) if events_text else "• 예정된 주요 학사일정이 없습니다."
