@@ -7,7 +7,7 @@ on:
 
 jobs:
   daily_report:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: 저장소 가져오기
         uses: actions/checkout@v3
